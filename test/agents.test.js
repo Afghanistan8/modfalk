@@ -6,13 +6,14 @@ import { assertChronology, evaluateChronologicalHoldout } from '../src/model.js'
 import { loadSports } from '../src/sports-data.js';
 
 const caseRow={caseId:'case-001',eventId:'event-001',eventTitle:'arrival',aId:'s1',aValue:'18:40',aDate:'2026-09-22',aWitness:'w1',aPassage:'p1',aText:'18:40',aUrl:'synthetic://a',bId:'s2',bValue:'19:10',bDate:'2026-09-22',bWitness:'w2',bPassage:'p2',bText:'19:10',bUrl:'synthetic://b',aIdentity:0.98,bIdentity:0.99};
-const medicalRow={patientId:'patient-001',medicineId:'amoxicillin',medicine:'Amoxicillin',medicineDate:new Date().toISOString(),ingredient:'amoxicillin',allergy:'penicillin',allergyDate:new Date().toISOString(),allergyRecord:'ar1',labelId:'l1',labelText:'Serious hypersensitivity is a contraindication.',labelDate:'2026-03-01',labelUrl:'https://dailymed.nlm.nih.gov/example'};
+const medicalRow={patientId:'patient-001',conditionId:'condition-001',condition:'Synthetic infection, type unspecified',conditionDate:new Date().toISOString(),patientSourceUrl:'synthetic://patient-record',patientRetrievedAt:new Date().toISOString(),medicineId:'amoxicillin',medicine:'Amoxicillin',medicineDate:new Date().toISOString(),ingredient:'amoxicillin',allergy:'penicillin',allergyDate:new Date().toISOString(),allergyRecord:'ar1',labelId:'l1',labelText:'Serious hypersensitivity is a contraindication.',labelDate:'2026-03-01',labelUrl:'https://dailymed.nlm.nih.gov/example'};
 const disasterRow={alertId:'a1',headline:'Scenario',issuedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+3600000).toISOString(),alertStatus:'scenario',origin:'synthetic',sourceUrl:'synthetic://alert',retrievedAt:new Date().toISOString(),zoneId:'z1',facilityId:'f1',facility:'Clinic',priority:3,roadId:'r1',roadStatus:'unknown',roadVerifiedAt:'',shelterId:'s1',shelter:'Shelter',available:30,capacityVerifiedAt:''};
 
 function fake(overrides={}) {
   const writes=[];
   const query=async(domain,cypher,params,readOnly)=>{
     if(!readOnly){writes.push({domain,cypher,params});return [{id:params.id}];}
+    if(cypher.includes('ex:Exhibit'))return overrides.gaps??[{eventId:'event-001',exhibitId:'camera-log',description:'Synthetic camera clock log; time sync unverified'}];
     if(cypher.includes('MATCH (c:Case'))return overrides.caseRows??[caseRow];
     if(cypher.includes('MATCH (p:Patient'))return overrides.medicalRows??[medicalRow];
     if(cypher.includes('MATCH (a:Alert'))return overrides.disasterRows??[disasterRow];
@@ -25,7 +26,7 @@ function fake(overrides={}) {
 }
 
 test('case path uses an MCP tool and creates a review action with both citations',async()=>{
-  const f=fake(),m=await createGraphMcpClient(f.query);try{const result=await runCase(m.client,'case-001','EW');assert.equal(result.status,'action-proposed');assert.equal(result.toolLog.tool,'case_conflicts');assert.equal(result.evidence.sources.length,2);assert.equal(result.guidance.agency,'Crown Prosecution Service');assert.equal(f.writes.length,1);assert.equal(f.writes[0].domain,'case');}finally{await m.close();}
+  const f=fake(),m=await createGraphMcpClient(f.query);try{const result=await runCase(m.client,'case-001','EW');assert.equal(result.status,'action-proposed');assert.equal(result.toolLog[0].tool,'case_conflicts');assert.equal(result.toolLog[1].tool,'case_gaps');assert.equal(result.evidence.sources.length,2);assert.ok(result.evidence.uncertainty.some(x=>x.includes('camera-log')));assert.equal(result.guidance.agency,'Crown Prosecution Service');assert.equal(f.writes.length,1);assert.equal(f.writes[0].domain,'case');}finally{await m.close();}
 });
 test('missing citation and weak identity stop a case action',async()=>{
   for(const change of [{aUrl:''},{aIdentity:0.4}]){const f=fake({caseRows:[{...caseRow,...change}]}),m=await createGraphMcpClient(f.query);try{assert.equal((await runCase(m.client,'case-001')).status,'needs-evidence');assert.equal(f.writes.length,0);}finally{await m.close();}}

@@ -8,23 +8,34 @@ MATCH (c:Case {id:$id})-[:HAS_EVENT]->(e:Event)<-[:ABOUT]-(a:Statement)<-[:GAVE]
 MATCH (e)<-[:ABOUT]-(b:Statement)<-[:GAVE]-(wb:Witness)
 MATCH (a)-[:SUPPORTED_BY]->(pa:Passage)-[:FROM_SOURCE]->(sa:Source)
 MATCH (b)-[:SUPPORTED_BY]->(pb:Passage)-[:FROM_SOURCE]->(sb:Source)
-WHERE a.id < b.id AND a.claimKey = b.claimKey AND a.claimValue <> b.claimValue
+MATCH (a)-[:EXPRESSES]->(aa:Assertion)
+MATCH (b)-[:EXPRESSES]->(ba:Assertion)
+WHERE a.id < b.id AND aa.claimKey = ba.claimKey AND aa.claimValue <> ba.claimValue
 RETURN c.id AS caseId,e.id AS eventId,e.title AS eventTitle,
- a.id AS aId,a.claimValue AS aValue,a.recordedAt AS aDate,wa.id AS aWitness,
+ a.id AS aId,aa.claimValue AS aValue,aa.eventAt AS aDate,wa.id AS aWitness,
  pa.id AS aPassage,pa.text AS aText,sa.url AS aUrl,sa.retrievedAt AS aIngestedAt,sa.kind AS aSourceKind,
- b.id AS bId,b.claimValue AS bValue,b.recordedAt AS bDate,wb.id AS bWitness,
+ b.id AS bId,ba.claimValue AS bValue,ba.eventAt AS bDate,wb.id AS bWitness,
  pb.id AS bPassage,pb.text AS bText,sb.url AS bUrl,sb.retrievedAt AS bIngestedAt,sb.kind AS bSourceKind,
  a.identityConfidence AS aIdentity,b.identityConfidence AS bIdentity`;
 
+export const CASE_GAPS_QUERY = `
+MATCH (c:Case {id:$id})-[:HAS_EVENT]->(e:Event)<-[:ABOUT]-(ex:Exhibit)
+OPTIONAL MATCH (ex)-[:SUPPORTED_BY]->(p:Passage)
+WITH e,ex,p WHERE p IS NULL
+RETURN e.id AS eventId,ex.id AS exhibitId,ex.description AS description`;
+
 export const MEDICAL_QUERY = `
 MATCH (p:Patient {id:$id})-[:TAKES]->(m:Medicine)-[:HAS_INGREDIENT]->(i:Ingredient)
+MATCH (p)-[:HAS_CONDITION]->(co:Condition)-[:FROM_SOURCE]->(ps:Source)
 MATCH (p)-[:HAS_ALLERGY]->(a:Allergy)
 MATCH (m)-[:HAS_LABEL]->(l:LabelSection)-[:WARNS_ABOUT]->(a)
 MATCH (l)-[:FROM_SOURCE]->(s:Source)
 WHERE a.severity = 'serious' AND l.warningKind = 'contraindication'
-RETURN p.id AS patientId,m.id AS medicineId,m.name AS medicine,
+RETURN p.id AS patientId,co.id AS conditionId,co.name AS condition,
+ co.recordedAt AS conditionDate,ps.url AS patientSourceUrl,ps.retrievedAt AS patientRetrievedAt,
+ m.id AS medicineId,m.name AS medicine,
  m.recordedAt AS medicineDate,i.name AS ingredient,a.name AS allergy,
- a.recordedAt AS allergyDate,a.recordId AS allergyRecord,
+ a.recordedAt AS allergyDate,a.ingestedAt AS allergyIngestedAt,a.recordId AS allergyRecord,
  l.id AS labelId,l.text AS labelText,l.labelDate AS labelDate,
  s.url AS labelUrl,s.retrievedAt AS retrievedAt,s.kind AS sourceKind`;
 
@@ -33,13 +44,17 @@ MATCH (a:Alert {id:$id})-[:AFFECTS]->(z:Zone)<-[:LOCATED_IN]-(f:Facility)
 MATCH (f)-[:USES_ROAD]->(r:Road)-[:LEADS_TO]->(s:Shelter)
 MATCH (s)-[:HAS_CAPACITY]->(c:Capacity)
 MATCH (a)-[:FROM_SOURCE]->(src:Source)
+OPTIONAL MATCH (z)-[:HAS_FORECAST]->(fc:Forecast)-[:FROM_SOURCE]->(fs:Source)
 RETURN a.id AS alertId,a.headline AS headline,a.issuedAt AS issuedAt,
  a.expiresAt AS expiresAt,a.status AS alertStatus,a.origin AS origin,
  src.url AS sourceUrl,src.retrievedAt AS retrievedAt,src.kind AS sourceKind,
  z.id AS zoneId,f.id AS facilityId,f.name AS facility,
  f.priority AS priority,r.id AS roadId,r.status AS roadStatus,
  r.verifiedAt AS roadVerifiedAt,s.id AS shelterId,s.name AS shelter,
- c.available AS available,c.verifiedAt AS capacityVerifiedAt`;
+ c.available AS available,c.verifiedAt AS capacityVerifiedAt,
+ fc.id AS forecastId,fc.summary AS forecastSummary,fc.startTime AS forecastStart,
+ fc.endTime AS forecastEnd,fs.url AS forecastUrl,fs.retrievedAt AS forecastRetrievedAt,
+ fs.kind AS forecastSourceKind`;
 
 export const DISASTER_SHORTEST_PATH = `
 MATCH (f:Facility {id:$facilityId}), (s:Shelter {id:$shelterId})
@@ -67,6 +82,7 @@ RETURN m.id AS id,m.kickoff AS kickoff,m.homeGoals AS homeGoals,
 
 export const QUERY_CATALOG = {
   case_conflicts: CASE_QUERY,
+  case_gaps: CASE_GAPS_QUERY,
   medical_contraindications: MEDICAL_QUERY,
   disaster_candidates: DISASTER_QUERY,
   disaster_shortest_path: DISASTER_SHORTEST_PATH,

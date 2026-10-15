@@ -25,10 +25,13 @@ async function seedCase() {
   ];
   for(const [id,witness,value,passage,text] of records){
     await node(d,'Statement',id,{claimKey:'arrival-time',claimValue:value,recordedAt:'2026-09-22T10:00:00Z',identityConfidence:0.98,synthetic:true});
+    await node(d,'Assertion',`assertion-${id}`,{claimKey:'arrival-time',claimValue:value,eventAt:`2026-09-21T${value}:00Z`,recordedAt:'2026-09-22T10:00:00Z',ingestedAt:stamp,classification:'synthetic-fact'});
     await node(d,'Passage',passage,{text,recordId:passage,ingestedAt:stamp,kind:'synthetic-fact'});
     await node(d,'Source',`source-${passage}`,{url:`synthetic://case-001/${passage}`,retrievedAt:stamp,kind:'synthetic-case-evidence'});
     await edge(d,'Witness',witness,'GAVE','Statement',id);
     await edge(d,'Statement',id,'ABOUT','Event','event-001');
+    await edge(d,'Statement',id,'EXPRESSES','Assertion',`assertion-${id}`);
+    await edge(d,'Assertion',`assertion-${id}`,'FROM_SOURCE','Source',`source-${passage}`);
     await edge(d,'Statement',id,'SUPPORTED_BY','Passage',passage);
     await edge(d,'Passage',passage,'FROM_SOURCE','Source',`source-${passage}`);
   }
@@ -47,21 +50,35 @@ async function seedCase() {
 async function seedMedical() {
   const d='medical',date=new Date().toISOString();
   await node(d,'Patient','patient-001',{name:'Synthetic Patient A',synthetic:true});
+  await node(d,'Condition','condition-001',{name:'Synthetic infection, type unspecified',recordedAt:date,recordId:'synthetic-condition-001',synthetic:true});
   await node(d,'Medicine','amoxicillin',{name:'Amoxicillin',recordedAt:date,synthetic:true});
   await node(d,'Ingredient','amoxicillin-ingredient',{name:'amoxicillin'});
-  await node(d,'Allergy','penicillin',{name:'penicillin',severity:'serious',recordedAt:date,recordId:'synthetic-allergy-001',synthetic:true});
-  await node(d,'LabelSection','amoxicillin-4',{text:'History of a serious hypersensitivity reaction to amoxicillin or to other beta-lactams.',labelDate:'2026-03-01',warningKind:'contraindication',recordId:'section-4'});
+  await node(d,'Allergy','penicillin',{name:'penicillin',severity:'serious',recordedAt:date,ingestedAt:stamp,recordId:'synthetic-allergy-001',synthetic:true});
+  await node(d,'LabelSection','amoxicillin-4',{text:'to amoxicillin or to other beta-lactams (e.g., penicillins or cephalosporins).',labelDate:'2026-03-01',warningKind:'contraindication',recordId:'section-4'});
+  await node(d,'Assertion','allergy-assertion-001',{claimKey:'serious-allergy',claimValue:'penicillin',eventAt:date,ingestedAt:stamp,classification:'synthetic-fact'});
+  await node(d,'Assertion','condition-assertion-001',{claimKey:'recorded-condition',claimValue:'infection, type unspecified',eventAt:date,ingestedAt:stamp,classification:'synthetic-fact'});
+  await node(d,'Assertion','label-assertion-001',{claimKey:'contraindication',claimValue:'serious beta-lactam hypersensitivity',eventAt:'2026-03-01',ingestedAt:stamp,classification:'source-fact'});
+  await node(d,'Source','patient-record-source',{url:'synthetic://patient-record',retrievedAt:stamp,kind:'synthetic-patient-record'});
   await node(d,'Source','dailymed-amoxicillin',{url:'https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=4fb7837e-964c-4d38-a3a5-b384b1bd6e08',retrievedAt:stamp,kind:'official-drug-label'});
   for(const args of [
     ['Patient','patient-001','TAKES','Medicine','amoxicillin'],['Patient','patient-001','HAS_ALLERGY','Allergy','penicillin'],
+    ['Patient','patient-001','HAS_CONDITION','Condition','condition-001'],
     ['Medicine','amoxicillin','HAS_INGREDIENT','Ingredient','amoxicillin-ingredient'],['Medicine','amoxicillin','HAS_LABEL','LabelSection','amoxicillin-4'],
     ['LabelSection','amoxicillin-4','WARNS_ABOUT','Allergy','penicillin'],['LabelSection','amoxicillin-4','FROM_SOURCE','Source','dailymed-amoxicillin']
   ])await edge(d,...args);
+  for(const labelAndId of [['Condition','condition-001'],['Allergy','penicillin'],['Medicine','amoxicillin']])await edge(d,...labelAndId,'FROM_SOURCE','Source','patient-record-source');
+  await edge(d,'Condition','condition-001','ASSERTED_BY','Assertion','condition-assertion-001');
+  await edge(d,'Assertion','condition-assertion-001','FROM_SOURCE','Source','patient-record-source');
+  await edge(d,'Allergy','penicillin','ASSERTED_BY','Assertion','allergy-assertion-001');
+  await edge(d,'Assertion','allergy-assertion-001','FROM_SOURCE','Source','patient-record-source');
+  await edge(d,'LabelSection','amoxicillin-4','ASSERTED_BY','Assertion','label-assertion-001');
+  await edge(d,'Assertion','label-assertion-001','FROM_SOURCE','Source','dailymed-amoxicillin');
 }
 
 async function seedDisaster() {
   const d='disaster',issuedAt=new Date().toISOString(),expiresAt=new Date(Date.now()+86400000).toISOString();
   await node(d,'Alert','scenario-flood-001',{headline:'Synthetic flash-flood scenario for graph demonstration',issuedAt,expiresAt,status:'scenario',origin:'synthetic'});
+  await node(d,'Assertion','alert-assertion-001',{claimKey:'hazard',claimValue:'synthetic flash-flood scenario',eventAt:issuedAt,ingestedAt:stamp,classification:'synthetic-fact'});
   await node(d,'Source','scenario-source',{url:'synthetic://disaster/flood-scenario-001',retrievedAt:stamp,kind:'synthetic-scenario'});
   await node(d,'Zone','zone-001',{name:'Synthetic Creek Zone'});
   await node(d,'Facility','clinic-001',{name:'Creekside Clinic',priority:3,synthetic:true});
@@ -70,8 +87,14 @@ async function seedDisaster() {
   await node(d,'Road','road-b',{name:'Hill Road',status:'unknown',verifiedAt:''});
   await node(d,'Shelter','shelter-001',{name:'Hill Centre',synthetic:true});
   await node(d,'Capacity','capacity-001',{available:40,verifiedAt:'',synthetic:true});
+  await node(d,'Forecast','forecast-scenario-001',{summary:'Synthetic heavy-rain forecast for scenario replay',startTime:issuedAt,endTime:expiresAt,origin:'synthetic'});
+  await node(d,'Source','forecast-scenario-source',{url:'synthetic://disaster/rain-forecast-001',retrievedAt:stamp,kind:'synthetic-forecast'});
   await edge(d,'Alert','scenario-flood-001','AFFECTS','Zone','zone-001');
   await edge(d,'Alert','scenario-flood-001','FROM_SOURCE','Source','scenario-source');
+  await edge(d,'Alert','scenario-flood-001','ASSERTED_BY','Assertion','alert-assertion-001');
+  await edge(d,'Assertion','alert-assertion-001','FROM_SOURCE','Source','scenario-source');
+  await edge(d,'Zone','zone-001','HAS_FORECAST','Forecast','forecast-scenario-001');
+  await edge(d,'Forecast','forecast-scenario-001','FROM_SOURCE','Source','forecast-scenario-source');
   for(const facility of ['clinic-001','school-001']){
     await edge(d,'Facility',facility,'LOCATED_IN','Zone','zone-001');
     await edge(d,'Facility',facility,'USES_ROAD','Road',facility==='clinic-001'?'road-a':'road-b');
@@ -97,6 +120,9 @@ async function seedSports() {
     await edge(d,'HistoricalMatch',m.id,'FROM_SOURCE','Source',sourceIds.get(m.sourceUrl));
   }
   const target=dataset.matches.find(m=>m.id===dataset.targetId),id=`replay-${target.id}`;
+  await node(d,'Assertion',`result-${target.id}`,{claimKey:'match-result',claimValue:`${target.homeGoals}-${target.awayGoals}`,eventAt:target.kickoff,ingestedAt:dataset.retrievedAt,classification:'source-fact'});
+  await edge(d,'HistoricalMatch',target.id,'ASSERTED_BY','Assertion',`result-${target.id}`);
+  await edge(d,'Assertion',`result-${target.id}`,'FROM_SOURCE','Source',sourceIds.get(target.sourceUrl));
   await node(d,'Match',id,{kickoff:target.kickoff,replay:true,sourceMatchId:target.id});
   await node(d,'GameState',`state-${id}`,{minute:0,homeGoals:0,awayGoals:0,inputKind:'manual-replay'});
   await edge(d,'Match',id,'HOME_TEAM','Team',target.homeId);

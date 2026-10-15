@@ -18,6 +18,7 @@ export function createGraphMcpServer(query = runQuery) {
     } catch(e) {return {content:[{type:'text',text:e.message}],isError:true};}
   });
   addRead('case_conflicts','case',QUERY_CATALOG.case_conflicts,'caseId');
+  addRead('case_gaps','case',QUERY_CATALOG.case_gaps,'caseId');
   addRead('medical_contraindications','medical',QUERY_CATALOG.medical_contraindications,'patientId');
   addRead('disaster_candidates','disaster',QUERY_CATALOG.disaster_candidates,'alertId');
   server.registerTool('disaster_shortest_path', {
@@ -37,23 +38,24 @@ export function createGraphMcpServer(query = runQuery) {
     inputSchema:z.object({domain:z.enum(['case','medical','disaster','sports']),kind:z.string(),subjectId:z.string(),summary:z.string(),evidenceJson:z.string(),tool:z.string()})
   },async input=>{
     const id=randomUUID(), createdAt=new Date().toISOString();
-    const cypher=`CREATE (f:Finding {id:$id,kind:$kind,subjectId:$subjectId,summary:$summary,evidenceJson:$evidenceJson,tool:$tool,createdAt:$createdAt})-[:TRIGGERED]->(a:Action {id:$id,kind:$kind,status:'proposed',createdAt:$createdAt}) RETURN a.id AS id`;
-    try {await query(input.domain,cypher,{...input,id,createdAt},false);return {content:[{type:'text',text:id}],structuredContent:{id,createdAt,status:'proposed'}};}
+    const classification=input.domain==='sports'?'model-output':'agent-inference';
+    const cypher=`CREATE (f:Finding {id:$id,kind:$kind,classification:$classification,subjectId:$subjectId,summary:$summary,evidenceJson:$evidenceJson,tool:$tool,createdAt:$createdAt})-[:TRIGGERED]->(a:Action {id:$id,kind:$kind,status:'proposed',createdAt:$createdAt}) RETURN a.id AS id`;
+    try {await query(input.domain,cypher,{...input,id,createdAt,classification},false);return {content:[{type:'text',text:id}],structuredContent:{id,createdAt,status:'proposed'}};}
     catch(e){return {content:[{type:'text',text:e.message}],isError:true};}
   });
   server.registerTool('review_action',{
     description:'Mark a proposed internal action reviewed or dismissed',
     inputSchema:z.object({domain:z.enum(['case','medical','disaster','sports']),actionId:z.string(),status:z.enum(['reviewed','dismissed'])})
   },async input=>{
-    const reviewedAt=new Date().toISOString();
-    try {const rows=await query(input.domain,`MATCH (a:Action {id:$id,status:'proposed'}) SET a.status=$status,a.reviewedAt=$reviewedAt RETURN a.id AS id,a.status AS status`,{id:input.actionId,status:input.status,reviewedAt},false);return {content:[{type:'text',text:JSON.stringify(rows)}],structuredContent:{rows}};}
+    const reviewedAt=new Date().toISOString(),reviewId=randomUUID();
+    try {const rows=await query(input.domain,`MATCH (a:Action {id:$id,status:'proposed'}) SET a.status=$status,a.reviewedAt=$reviewedAt CREATE (a)-[:HAS_REVIEW]->(:Review {id:$reviewId,status:$status,reviewedAt:$reviewedAt,reviewer:'local reviewer'}) RETURN a.id AS id,a.status AS status`,{id:input.actionId,status:input.status,reviewedAt,reviewId},false);return {content:[{type:'text',text:JSON.stringify(rows)}],structuredContent:{rows}};}
     catch(e){return {content:[{type:'text',text:e.message}],isError:true};}
   });
   server.registerTool('list_actions',{
     description:'List recent internal actions and reviewer status from one domain graph',
     inputSchema:z.object({domain:z.enum(['case','medical','disaster','sports'])}),annotations:{readOnlyHint:true}
   },async input=>{
-    try {const rows=await query(input.domain,`MATCH (f:Finding)-[:TRIGGERED]->(a:Action) RETURN a.id AS id,a.kind AS kind,a.status AS status,a.createdAt AS createdAt,a.reviewedAt AS reviewedAt,f.subjectId AS subjectId,f.summary AS summary,f.evidenceJson AS evidenceJson,f.tool AS tool ORDER BY createdAt DESC LIMIT 30`,{},true);return {content:[{type:'text',text:JSON.stringify(rows)}],structuredContent:{rows}};}
+    try {const rows=await query(input.domain,`MATCH (f:Finding)-[:TRIGGERED]->(a:Action) RETURN a.id AS id,a.kind AS kind,a.status AS status,a.createdAt AS createdAt,a.reviewedAt AS reviewedAt,f.subjectId AS subjectId,f.summary AS summary,f.evidenceJson AS evidenceJson,f.tool AS tool,f.classification AS classification ORDER BY createdAt DESC LIMIT 30`,{},true);return {content:[{type:'text',text:JSON.stringify(rows)}],structuredContent:{rows}};}
     catch(e){return {content:[{type:'text',text:e.message}],isError:true};}
   });
   return server;

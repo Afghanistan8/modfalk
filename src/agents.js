@@ -10,15 +10,18 @@ const makeAction=async(client,domain,kind,subjectId,summary,ev,tool)=>callGraphT
 export async function runCase(client,caseId,jurisdiction='US') {
   const log=toolLog('case_conflicts','Two witness statements must connect through the same event and separate passages.',QUERY_CATALOG.case_conflicts);
   const {rows}=await callGraphTool(client,log.tool,{caseId});
+  const gapLog=toolLog('case_gaps','Find event-linked exhibits that have no source passage for corroboration.',QUERY_CATALOG.case_gaps);
+  const gaps=(await callGraphTool(client,gapLog.tool,{caseId})).rows||[];
   const r=rows?.[0];
-  if(!r) return {status:'no-finding',message:'No connected contradiction found.',toolLog:log};
+  if(!r) return {status:'no-finding',message:gaps.length?'An exhibit lacks a source passage; inspect the graph before concluding.':'No connected contradiction found.',toolLog:[log,gapLog]};
   const ev=evidence(`Case ${r.caseId} → Event ${r.eventId} ← Statements ${r.aId} / ${r.bId} ← Witnesses ${r.aWitness} / ${r.bWitness}`,[citation(r.aUrl,r.aPassage,r.aText,r.aDate,r.aIngestedAt,r.aSourceKind||'synthetic-fact'),citation(r.bUrl,r.bPassage,r.bText,r.bDate,r.bIngestedAt,r.bSourceKind||'synthetic-fact')],[]);
   if(!r.aUrl||!r.bUrl||!r.aText||!r.bText) ev.uncertainty.push('A required source passage or URL is missing.');
   if(Number(r.aIdentity)<0.8||Number(r.bIdentity)<0.8) ev.uncertainty.push('Witness identity match is uncertain.');
-  if(ev.uncertainty.length) return {status:'needs-evidence',message:'The finding needs source or identity verification before an action is created.',evidence:ev,toolLog:log};
-  const summary=`Lawyer review: conflicting ${r.eventTitle} statements (${r.aId}: ${r.aValue}; ${r.bId}: ${r.bValue}). No legal conclusion made.`;
+  if(ev.uncertainty.length) return {status:'needs-evidence',message:'The finding needs source or identity verification before an action is created.',evidence:ev,toolLog:[log,gapLog]};
+  for(const gap of gaps)ev.uncertainty.push(`Potentially overlooked ${gap.exhibitId}: ${gap.description}; no source passage attached.`);
+  const summary=`Lawyer review: conflicting ${r.eventTitle} statements (${r.aId}: ${r.aValue}; ${r.bId}: ${r.bValue}). ${gaps.length} exhibit(s) need corroboration review. No legal conclusion made.`;
   const action=await makeAction(client,'case','lawyer-review',caseId,summary,ev,log.tool);
-  return {status:'action-proposed',summary,evidence:ev,action,toolLog:log,jurisdiction,guidance:GUIDANCE[jurisdiction]||GUIDANCE.US};
+  return {status:'action-proposed',summary,evidence:ev,action,toolLog:[log,gapLog],jurisdiction,guidance:GUIDANCE[jurisdiction]||GUIDANCE.US};
 }
 
 export const GUIDANCE={
@@ -31,11 +34,12 @@ export async function runMedical(client,patientId) {
   const log=toolLog('medical_contraindications','A current medicine, ingredient, recorded allergy, and label warning must connect.',QUERY_CATALOG.medical_contraindications);
   const {rows}=await callGraphTool(client,log.tool,{patientId});const r=rows?.[0];
   if(!r) return {status:'no-finding',message:'No documented contraindication path found; this is not a safety clearance.',toolLog:log};
-  const ev=evidence(`Patient ${r.patientId} → Medicine ${r.medicineId} → Ingredient ${r.ingredient}; Patient → Allergy ${r.allergy} ← Label ${r.labelId}`,[citation(r.labelUrl,r.labelId,r.labelText,r.labelDate,r.retrievedAt,r.sourceKind||'official-drug-label'),citation('synthetic://patient-record',r.allergyRecord,`Recorded serious ${r.allergy} allergy`,r.allergyDate,undefined,'synthetic-fact')],[]);
+  const ev=evidence(`Patient ${r.patientId} → Condition ${r.conditionId}; Patient → Medicine ${r.medicineId} → Ingredient ${r.ingredient}; Patient → Allergy ${r.allergy} ← Label ${r.labelId}`,[citation(r.labelUrl,r.labelId,r.labelText,r.labelDate,r.retrievedAt,r.sourceKind||'official-drug-label'),citation(r.patientSourceUrl,r.allergyRecord,`Recorded serious ${r.allergy} allergy`,r.allergyDate,r.patientRetrievedAt,'synthetic-fact'),citation(r.patientSourceUrl,r.conditionId,r.condition,r.conditionDate,r.patientRetrievedAt,'synthetic-fact')],[]);
   const stale=date=>!date||Date.now()-Date.parse(date)>365*86400000;
   if(stale(r.medicineDate))ev.uncertainty.push('Medicine record is missing or over one year old.');
   if(stale(r.allergyDate))ev.uncertainty.push('Allergy record is missing or over one year old.');
   if(!r.labelUrl||!r.labelText)ev.uncertainty.push('Drug-label citation is missing.');
+  if(!r.patientSourceUrl||!r.condition)ev.uncertainty.push('Synthetic patient source or condition record is missing.');
   if(ev.uncertainty.length)return {status:'needs-evidence',message:'Clinical facts or label need verification before an alert is created.',evidence:ev,toolLog:log};
   const summary=`Clinician review: ${r.medicine} and recorded serious ${r.allergy} allergy match label contraindication ${r.labelId}. No treatment advice is provided.`;
   const action=await makeAction(client,'medical','clinician-alert',patientId,summary,ev,log.tool);
@@ -52,6 +56,8 @@ export async function runDisaster(client,alertId) {
   const routeLog=toolLog('disaster_shortest_path','Weighted shortest path ranks candidate shelter routes by graph distance.',QUERY_CATALOG.disaster_shortest_path);
   for(const r of ranked){const result=await callGraphTool(client,routeLog.tool,{facilityId:r.facilityId,shelterId:r.shelterId});r.route=result.rows?.[0]||null;}
   const ev=evidence(ranked.map(r=>`Alert ${r.alertId} → Zone ${r.zoneId} → Facility ${r.facilityId} → Road ${r.roadId} → Shelter ${r.shelterId} → Capacity`).join('\n'),[citation(rows[0].sourceUrl,rows[0].alertId,rows[0].headline,rows[0].issuedAt,rows[0].retrievedAt,rows[0].sourceKind||'synthetic-scenario')],[]);
+  if(rows[0].forecastId)ev.sources.push(citation(rows[0].forecastUrl,rows[0].forecastId,rows[0].forecastSummary,rows[0].forecastStart,rows[0].forecastRetrievedAt,rows[0].forecastSourceKind));
+  else ev.uncertainty.push('No linked forecast was available.');
   if(rows[0].origin!=='official')ev.uncertainty.push('Scenario alert is synthetic, not an official live warning.');
   for(const r of ranked){if(r.roadStatus!=='open'||!r.roadVerifiedAt)ev.uncertainty.push(`${r.roadId} is not verified open.`);if(!r.capacityVerifiedAt)ev.uncertainty.push(`${r.shelterId} capacity is unverified.`);}
   if(ranked.some(r=>!r.route))ev.uncertainty.push('A candidate shelter has no computed route.');
@@ -72,10 +78,13 @@ export async function runSports(client,matchId,state) {
   const useState=state||{minute:context.minute,homeGoals:context.homeGoals,awayGoals:context.awayGoals};
   const forecast=predictMatch(prior,context.homeId,context.awayId,useState);
   const metric=evaluateChronologicalHoldout(history);
+  const previous=(await callGraphTool(client,'list_actions',{domain:'sports'})).rows?.find(a=>a.subjectId===matchId);
+  let priorState={minute:context.minute,homeGoals:context.homeGoals,awayGoals:context.awayGoals};
+  if(previous){try{priorState=JSON.parse(previous.evidenceJson).state||priorState;}catch{}}
   const ev=evidence(`Match ${matchId} → ${context.homeId} / ${context.awayId} → ${prior.length} prior matches → opponents; Match → Lineup → ${context.lineup?.length||0} players`,prior.slice(-3).map(m=>citation(m.sourceUrl,m.id,`${m.homeId} ${m.homeGoals}–${m.awayGoals} ${m.awayId}`,m.kickoff,m.retrievedAt,m.sourceKind||'public-historical-data')),[]);
   if(!context.lineup?.length)ev.uncertainty.push('Lineup coverage is missing.');
   ev.uncertainty.push('Historical replay; game state is manual input. Probabilities are model estimates, not certainties.');
-  const explanation=`Manual game state ${useState.minute}' ${useState.homeGoals}-${useState.awayGoals}; prior match form and current score affect the three-way baseline.`;
+  const explanation=`Manual game state changed from ${priorState.minute}' ${priorState.homeGoals}-${priorState.awayGoals} to ${useState.minute}' ${useState.homeGoals}-${useState.awayGoals}; prior match form and current score affect the three-way baseline. Lineup is context only.`;
   const summary=`Forecast revision for ${context.home} vs ${context.away}: home ${(forecast.home*100).toFixed(1)}%, draw ${(forecast.draw*100).toFixed(1)}%, away ${(forecast.away*100).toFixed(1)}%. ${explanation}`;
   const action=await makeAction(client,'sports','forecast-revision',matchId,summary,{...ev,forecast,metric,state:useState,forecastTime:new Date().toISOString()},contextLog.tool);
   return {status:'action-proposed',summary,evidence:ev,action,toolLog:[contextLog,historyLog],forecast,metric,forecastTime:action.createdAt,manualState:useState,home:context.home,away:context.away};

@@ -20,7 +20,7 @@ npm start
 
 Open **http://127.0.0.1:4173**. FalkorDB Browser is at **http://127.0.0.1:3000**. A named Docker volume and append-only persistence retain the graph. `npm run seed` is idempotent for the source nodes and edges; every agent run intentionally creates a new reviewable action. Do not use `docker compose down -v` unless you intend to delete graph data.
 
-For an official live NWS alert, optionally run `npm run import:nws -- TX` (replace `TX` with a two-letter state code), then use the returned alert ID in the Disaster response tab. If no active alert is returned, the synthetic scenario remains available. The imported alert is official; its associated facility, shelter, road, and capacity are expressly synthetic and unverified. The default demo alert is entirely synthetic.
+For an official live NWS alert and forecast at a point, optionally run `npm run import:nws -- 29.76 -95.36` (replace the latitude and longitude with a US point), then use the returned alert ID in the Disaster response tab. If no active alert is returned, the synthetic scenario remains available. The imported alert and forecast are official; its associated facility, shelter, road, and capacity are expressly synthetic and unverified. The default demo alert and forecast are entirely synthetic.
 
 Verification:
 
@@ -47,13 +47,13 @@ FalkorDB holds four separate graphs: `modfalk_case`, `modfalk_medical`, `modfalk
 
 ## Graph model and decision paths
 
-All domains use source provenance and internal workflow nodes. `Source` carries a URL, type, and retrieval time. Domain facts carry record IDs and event dates. A `Finding` records a tool name, subject, summary, creation time, and serialized evidence trail; `(:Finding)-[:TRIGGERED]->(:Action)` links it to a proposed, reviewed, or dismissed action. The evidence trail identifies source records, exact displayed passages or record summaries, path, and uncertainty. Public guidance is separate from synthetic case evidence. Missing citations or uncertain identities stop the case agent before it writes an action; missing or stale clinical facts stop the medical agent. A scenario warning or unverified road and capacity remains visibly uncertain in a disaster brief.
+All domains use source provenance and internal workflow nodes. `Source` carries a URL, type, and retrieval time. Dated `Assertion` nodes distinguish synthetic and public source facts; key demo facts link to their assertions and sources. A `Finding` records its agent-inference or model-output classification, tool name, subject, summary, creation time, and serialized evidence trail; `(:Finding)-[:TRIGGERED]->(:Action)` links it to a proposed action. A reviewer update creates a `Review` node and changes the action to reviewed or dismissed. The evidence trail identifies source records, exact displayed passages or record summaries, path, and uncertainty. Public guidance is separate from synthetic case evidence. Missing citations or uncertain identities stop the case agent before it writes an action; missing or stale clinical facts stop the medical agent. A scenario warning or unverified road and capacity remains visibly uncertain in a disaster brief.
 
 | Graph | Representative multi-hop path | Tool and consequence |
 | --- | --- | --- |
-| Case Evidence | `Case → Event ← Statement ← Witness`, with each statement linked to its `Passage → Source` | `case_conflicts` finds divergent claims and writes a lawyer-review task. |
-| Medical overlook | `Patient → Medicine → Ingredient`; `Patient → Allergy ← LabelSection → Source` | `medical_contraindications` finds a documented serious allergy concern and writes a clinician-review alert. |
-| Disaster response | `Alert → Zone ← Facility → Road → Shelter → Capacity` | `disaster_candidates` plus `disaster_shortest_path` writes a prioritized incident-team brief. |
+| Case Evidence | `Case → Event ← Statement ← Witness`, with each statement linked to its `Passage → Source` and event-linked exhibits inspected for missing passages | `case_conflicts` and `case_gaps` find divergent claims and missing corroboration, then write a lawyer-review task. |
+| Medical overlook | `Patient → Condition → Source`; `Patient → Medicine → Ingredient`; `Patient → Allergy ← LabelSection → Source` | `medical_contraindications` finds a documented serious allergy concern and writes a clinician-review alert. |
+| Disaster response | `Alert → Zone ← Facility → Road → Shelter → Capacity`, plus `Zone → Forecast → Source` | `disaster_candidates` plus `disaster_shortest_path` writes a prioritized incident-team brief. |
 | Sports Forcast | `Match → Home/Away Team ← HistoricalMatch → Opponent`; `Match → Lineup → Player`; `Match → GameState` | `sports_context` and `sports_history` write a forecast revision after manual game-state input. |
 
 The disaster route ranking calls FalkorDB's [`algo.SPpaths`](https://docs.falkordb.com/algorithms/sppath) with `weightProp: 'distanceKm'`. The distance is a graph route over *synthetic* road edges, not a verified driving route. The current scenario labels roads and capacity unverified. This algorithm is useful because the agent must compare shelter paths across a road network, rather than treating every candidate as equally close. See the full [Cypher catalog](src/queries.js).
@@ -65,8 +65,10 @@ MATCH (c:Case {id:$id})-[:HAS_EVENT]->(e:Event)<-[:ABOUT]-(a:Statement)<-[:GAVE]
 MATCH (e)<-[:ABOUT]-(b:Statement)<-[:GAVE]-(wb:Witness)
 MATCH (a)-[:SUPPORTED_BY]->(pa:Passage)-[:FROM_SOURCE]->(sa:Source)
 MATCH (b)-[:SUPPORTED_BY]->(pb:Passage)-[:FROM_SOURCE]->(sb:Source)
-WHERE a.id < b.id AND a.claimKey = b.claimKey AND a.claimValue <> b.claimValue
-RETURN a.id, b.id, pa.id, pb.id, sa.url, sb.url
+MATCH (a)-[:EXPRESSES]->(aa:Assertion)
+MATCH (b)-[:EXPRESSES]->(ba:Assertion)
+WHERE a.id < b.id AND aa.claimKey = ba.claimKey AND aa.claimValue <> ba.claimValue
+RETURN a.id, b.id, aa.claimValue, ba.claimValue, pa.id, pb.id, sa.url, sb.url
 ```
 
 For the seeded case, the agent selects `case_conflicts` because the two witnesses discuss the same synthetic arrival event. It receives `statement-a` (`18:40`) and `statement-b` (`19:10`) with distinct synthetic source passages, then calls:
@@ -85,8 +87,10 @@ The resulting `Finding → Action` is visible in the review queue with a propose
 
 - **Case Evidence:** Records are synthetic. The jurisdiction selector links to current official [US DOJ Justice Manual](https://www.justice.gov/jm/jm-9-5000-issues-related-trials-and-other-court-proceedings), [England and Wales CPS Disclosure Manual](https://www.cps.gov.uk/prosecution-guidance/disclosure-manual), and [Canadian PPSC Deskbook](https://www.ppsc-sppc.gc.ca/eng/pub/fpsd-sfpg/fps-sfp/tpd/p2/ch05.html). The app never decides guilt, admissibility, or a disclosure duty.
 - **Medical overlook:** The synthetic patient has a recorded serious penicillin allergy and current amoxicillin entry. The public [DailyMed amoxicillin label](https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=4fb7837e-964c-4d38-a3a5-b384b1bd6e08), section 4, documents the concern. NLM notes that DailyMed is not a complete list of all FDA-regulated labeling. The [FDA's January 2026 clinical decision-support guidance](https://www.fda.gov/regulatory-information/search-fda-guidance-documents/clinical-decision-support-software) is a review reference. The app never diagnoses, prescribes, changes a dose, or claims safety from an absent warning.
-- **Disaster response:** The [NWS API](https://www.weather.gov/documentation/services-web-api) adapter can import an active official alert with issue and expiry times. The replayable default alert and every facility, shelter, road, capacity, and distance are synthetic. No public warning or dispatch is issued.
+- **Disaster response:** The [NWS API](https://www.weather.gov/documentation/services-web-api) adapter can import an active official alert and a forecast for the same point, with issue and expiry times. The replayable default alert and forecast and every facility, shelter, road, capacity, and distance are synthetic. No public warning or dispatch is issued.
 - **Sports Forcast:** `npm run prepare:sports` downloads [StatsBomb Open Data](https://github.com/hudl/open-data) for FA Women's Super League seasons 2018/19, 2019/20, 2020/21, and 2023/24. StatsBomb is the data source; their repository requests attribution and logo use for published analysis. The local downloaded dataset is ignored by Git and is re-created during setup. The fixed three-way form model uses a 70/30 time split and reports a multiclass Brier score; the downloaded 457-match snapshot yielded **0.1757** on 138 held-out matches. The selected match is a *historical replay*, and manual game-state changes create new revisions. There is no trusted live sports feed. The model is a transparent baseline, not a betting or certainty claim.
+
+![StatsBomb logo](https://raw.githubusercontent.com/hudl/open-data/master/img/SB%20-%20Icon%20Lockup%20-%20Colour%20positive.png)
 
 The sports model uses only matches with kickoff earlier than the replay match for its displayed prediction. Its holdout score is evaluated without fitting or tuning parameters on holdout outcomes. Prior results may be used for later replay predictions only after those matches occurred. Lineup and player links are displayed as context; this version does not claim a measured lineup effect.
 
