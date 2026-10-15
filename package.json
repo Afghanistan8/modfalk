@@ -1,0 +1,21 @@
+{
+  "name": "modfalk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "seed": "node src/seed.js",
+    "prepare:sports": "node src/sports-data.js",
+    "import:nws": "node src/nws.js",
+    "test": "node --test test/agents.test.js test/server.test.js",
+    "test:integration": "node --test test/integration.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.3.1",
+    "@modelcontextprotocol/server": "2.3.1",
+    "falkordb": "6.8.0",
+    "zod": "^4.1.12"
+  },
+  "engines": {"node": ">=22"}
+}

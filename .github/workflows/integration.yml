@@ -1,0 +1,21 @@
+name: FalkorDB integration
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: docker compose up -d --wait
+      - run: npm run prepare:sports
+      - run: npm test
+      - run: npm run test:integration
+      - if: always()
+        run: docker compose logs --tail=100
