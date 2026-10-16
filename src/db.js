@@ -1,12 +1,19 @@
 import { FalkorDB } from 'falkordb';
 import { GRAPHS } from './queries.js';
 
+try { process.loadEnvFile(); } catch (error) {
+  if (error?.code !== 'ENOENT') throw error;
+}
+
 let connection;
 export async function getDb() {
   if (!connection) {
     connection = FalkorDB.connect({
       socket: {host: process.env.FALKORDB_HOST || '127.0.0.1',
-        port: Number(process.env.FALKORDB_PORT || 6379), connectTimeout: 2500},
+        port: Number(process.env.FALKORDB_PORT || 6379),
+        connectTimeout: 2500,
+        tls: process.env.FALKORDB_TLS === 'true'},
+      username: process.env.FALKORDB_USERNAME || undefined,
       password: process.env.FALKORDB_PASSWORD || undefined
     }).catch(error => { connection = undefined; throw error; });
   }
