@@ -33,14 +33,34 @@ export function createGraphMcpServer(query = runQuery) {
     try {const rows=await query('sports',QUERY_CATALOG.sports_history,{},true);return {content:[{type:'text',text:JSON.stringify(rows)}],structuredContent:{rows}};}
     catch(e){return {content:[{type:'text',text:e.message}],isError:true};}
   });
+  server.registerTool('agent_memory', {
+    description:'Read prior findings and graph-native agent context for a subject',
+    inputSchema:z.object({domain:z.enum(['case','medical','disaster','sports']),subjectId:z.string().min(1)}),
+    annotations:{readOnlyHint:true}
+  }, async input => {
+    try {const rows=await query(input.domain,QUERY_CATALOG.agent_memory,{id:input.subjectId},true);return {content:[{type:'text',text:JSON.stringify(rows)}],structuredContent:{rows}};}
+    catch(e){return {content:[{type:'text',text:e.message}],isError:true};}
+  });
   server.registerTool('create_action',{
     description:'Persist a reviewable finding and internal action in the domain graph',
-    inputSchema:z.object({domain:z.enum(['case','medical','disaster','sports']),kind:z.string(),subjectId:z.string(),summary:z.string(),evidenceJson:z.string(),tool:z.string()})
+    inputSchema:z.object({domain:z.enum(['case','medical','disaster','sports']),kind:z.string(),subjectId:z.string(),summary:z.string(),evidenceJson:z.string(),tool:z.string(),contextJson:z.string().optional()})
   },async input=>{
     const id=randomUUID(), createdAt=new Date().toISOString();
     const classification=input.domain==='sports'?'model-output':'agent-inference';
-    const cypher=`CREATE (f:Finding {id:$id,kind:$kind,classification:$classification,subjectId:$subjectId,summary:$summary,evidenceJson:$evidenceJson,tool:$tool,createdAt:$createdAt})-[:TRIGGERED]->(a:Action {id:$id,kind:$kind,status:'proposed',createdAt:$createdAt}) RETURN a.id AS id`;
-    try {await query(input.domain,cypher,{...input,id,createdAt,classification},false);return {content:[{type:'text',text:id}],structuredContent:{id,createdAt,status:'proposed'}};}
+    let context={};try{context=input.contextJson?JSON.parse(input.contextJson):{};}catch{context={};}
+    const tools=Array.isArray(context.toolLog)?context.toolLog:[];
+    const citations=Array.isArray(context.sources)?context.sources:[];
+    const cypher=`CREATE (f:Finding {id:$id,kind:$kind,classification:$classification,subjectId:$subjectId,summary:$summary,evidenceJson:$evidenceJson,tool:$tool,createdAt:$createdAt})-[:TRIGGERED]->(a:Action {id:$id,kind:$kind,status:'proposed',createdAt:$createdAt})
+CREATE (f)-[:USED_CONTEXT]->(c:AgentContext {id:$contextId,domain:$domain,subjectId:$subjectId,tool:$tool,path:$path,uncertaintyJson:$uncertaintyJson,createdAt:$createdAt})
+FOREACH (t IN $tools | CREATE (ti:ToolInvocation {id:t.id,tool:t.tool,reason:t.reason,query:t.query}) CREATE (c)-[:USED_TOOL]->(ti))
+WITH f,a,c
+UNWIND $citations AS s
+OPTIONAL MATCH (src:Source {url:s.url})
+CREATE (ce:ContextEvidence {id:s.recordId,url:s.url,recordId:s.recordId,text:s.text,date:s.date,retrievedAt:s.retrievedAt,kind:s.kind})
+CREATE (c)-[:CITED]->(ce)
+FOREACH (_ IN CASE WHEN src IS NULL THEN [] ELSE [1] END | CREATE (ce)-[:DERIVED_FROM]->(src))
+RETURN a.id AS id`;
+    try {await query(input.domain,cypher,{...input,id,createdAt,classification,domain:input.domain,contextId:`context-${id}`,path:context.path||'',uncertaintyJson:JSON.stringify(context.uncertainty||[]),tools:tools.map((t,i)=>({...t,id:`tool-${id}-${i}`})),citations},false);return {content:[{type:'text',text:id}],structuredContent:{id,createdAt,status:'proposed',contextId:`context-${id}`}};}
     catch(e){return {content:[{type:'text',text:e.message}],isError:true};}
   });
   server.registerTool('review_action',{

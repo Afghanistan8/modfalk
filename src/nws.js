@@ -43,4 +43,19 @@ export async function importNws(latitude=29.76,longitude=-95.36) {
   return {imported:true,alertId:id,headline:p.headline||p.event,sourceUrl,forecastUrl,expiresAt:p.expires,facilityStatus:'synthetic/unverified'};
 }
 
+export async function importActiveNws(limit=5) {
+  const url='https://api.weather.gov/alerts/active?status=actual',headers={'User-Agent':'ModFalk/0.1 (contact: project owner via GitHub Afghanistan8/modfalk)','Accept':'application/geo+json'};
+  const response=await fetch(url,{headers});if(!response.ok)throw new Error(`NWS API ${response.status}`);
+  const features=(await response.json()).features||[],now=Date.now(),active=features.filter(f=>Date.parse(f.properties?.expires||'')>now).slice(0,limit),imported=[];
+  for(const feature of active){
+    const p=feature.properties,id=`nws-${String(p.id||feature.id).split('/').pop()}`,sourceUrl=feature.id||url;
+    await node('disaster','Alert',id,{headline:p.headline||p.event,issuedAt:p.sent||p.effective,expiresAt:p.expires,status:p.status||'actual',origin:'official',areaDesc:p.areaDesc});
+    await node('disaster','Source',`source-${id}`,{url:sourceUrl,retrievedAt:new Date().toISOString(),kind:'official-NWS-alert'});
+    await edge('disaster','Alert',id,'FROM_SOURCE','Source',`source-${id}`);
+    await edge('disaster','Alert',id,'AFFECTS','Zone','zone-001');
+    imported.push({id,headline:p.headline||p.event,area:p.areaDesc,expiresAt:p.expires,sourceUrl});
+  }
+  return {source:url,imported};
+}
+
 if(process.argv[1]?.endsWith('nws.js'))importNws(process.argv[2]||29.76,process.argv[3]||-95.36).then(x=>console.log(JSON.stringify(x,null,2))).catch(e=>{console.error(e);process.exitCode=1;}).finally(closeDb);

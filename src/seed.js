@@ -45,6 +45,10 @@ async function seedCase() {
     await node(d,'Source',`guidance-source-${code}`,{url,retrievedAt:stamp,kind:'official-guidance'});
     await edge(d,'Guidance',`guidance-${code}`,'FROM_SOURCE','Source',`guidance-source-${code}`);
   }
+  for(const [id,name] of [['case-002','Port arrival timeline'],['case-003','Transit handoff timeline']]){
+    await node(d,'Case',id,{name,synthetic:true});
+    await edge(d,'Case',id,'HAS_EVENT','Event','event-001');
+  }
 }
 
 async function seedMedical() {
@@ -54,7 +58,7 @@ async function seedMedical() {
   await node(d,'Medicine','amoxicillin',{name:'Amoxicillin',recordedAt:date,synthetic:true});
   await node(d,'Ingredient','amoxicillin-ingredient',{name:'amoxicillin'});
   await node(d,'Allergy','penicillin',{name:'penicillin',severity:'serious',recordedAt:date,ingestedAt:stamp,recordId:'synthetic-allergy-001',synthetic:true});
-  await node(d,'LabelSection','amoxicillin-4',{text:'to amoxicillin or to other beta-lactams (e.g., penicillins or cephalosporins).',labelDate:'2026-03-01',warningKind:'contraindication',recordId:'section-4'});
+  await node(d,'LabelSection','amoxicillin-4',{text:'to amoxicillin or to other beta-lactams (e.g., penicillins or cephalosporins).',labelDate:'2026-03-01',labelDateIso:'2026-03-01',warningKind:'contraindication',recordId:'section-4'});
   await node(d,'Assertion','allergy-assertion-001',{claimKey:'serious-allergy',claimValue:'penicillin',eventAt:date,ingestedAt:stamp,classification:'synthetic-fact'});
   await node(d,'Assertion','condition-assertion-001',{claimKey:'recorded-condition',claimValue:'infection, type unspecified',eventAt:date,ingestedAt:stamp,classification:'synthetic-fact'});
   await node(d,'Assertion','label-assertion-001',{claimKey:'contraindication',claimValue:'serious beta-lactam hypersensitivity',eventAt:'2026-03-01',ingestedAt:stamp,classification:'source-fact'});
@@ -73,6 +77,13 @@ async function seedMedical() {
   await edge(d,'Assertion','allergy-assertion-001','FROM_SOURCE','Source','patient-record-source');
   await edge(d,'LabelSection','amoxicillin-4','ASSERTED_BY','Assertion','label-assertion-001');
   await edge(d,'Assertion','label-assertion-001','FROM_SOURCE','Source','dailymed-amoxicillin');
+  for(const [id,name] of [['patient-002','Synthetic Patient B'],['patient-003','Synthetic Patient C']]){
+    await node(d,'Patient',id,{name,synthetic:true});
+    for(const args of [
+      ['Patient',id,'TAKES','Medicine','amoxicillin'],['Patient',id,'HAS_ALLERGY','Allergy','penicillin'],
+      ['Patient',id,'HAS_CONDITION','Condition','condition-001']
+    ])await edge(d,...args);
+  }
 }
 
 async function seedDisaster() {
@@ -105,6 +116,13 @@ async function seedDisaster() {
     await edge(d,'Road',road,'ROUTE','Shelter','shelter-001',{distanceKm:road==='road-a'?4:2});
   }
   await edge(d,'Shelter','shelter-001','HAS_CAPACITY','Capacity','capacity-001');
+  for(const [id,headline] of [['scenario-wildfire-002','Synthetic wildfire evacuation scenario'],['scenario-storm-003','Synthetic coastal storm scenario']]){
+    const sourceId=`source-${id}`;
+    await node(d,'Alert',id,{headline,issuedAt,expiresAt,status:'scenario',origin:'synthetic'});
+    await node(d,'Source',sourceId,{url:`synthetic://disaster/${id}`,retrievedAt:stamp,kind:'synthetic-scenario'});
+    await edge(d,'Alert',id,'AFFECTS','Zone','zone-001');
+    await edge(d,'Alert',id,'FROM_SOURCE','Source',sourceId);
+  }
 }
 
 async function seedSports() {
@@ -114,7 +132,7 @@ async function seedSports() {
   const teams=new Map();for(const m of dataset.matches){teams.set(m.homeId,m.home);teams.set(m.awayId,m.away);}
   for(const [id,name] of teams)await node(d,'Team',id,{name});
   for(const m of dataset.matches){
-    await node(d,'HistoricalMatch',m.id,{kickoff:m.kickoff,homeGoals:m.homeGoals,awayGoals:m.awayGoals,season:m.season,kind:'source-fact'});
+    await node(d,'HistoricalMatch',m.id,{kickoff:m.kickoff,homeGoals:m.homeGoals,awayGoals:m.awayGoals,season:m.season,competition:m.competition,country:m.country,kind:'source-fact'});
     await edge(d,'HistoricalMatch',m.id,'HOME_TEAM','Team',m.homeId);
     await edge(d,'HistoricalMatch',m.id,'AWAY_TEAM','Team',m.awayId);
     await edge(d,'HistoricalMatch',m.id,'FROM_SOURCE','Source',sourceIds.get(m.sourceUrl));
@@ -137,6 +155,15 @@ async function seedSports() {
       await node(d,'Player',String(p.player_id),{name:p.player_name});
       await edge(d,'Lineup',`lineup-${id}`,'INCLUDES','Player',String(p.player_id));
     }
+  }
+  const replayMatches=[target,...[...new Map(dataset.matches.map(m=>[m.competition,m])).values()].slice(0,10)].filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i);
+  for(const m of replayMatches){
+    const replayId=`replay-${m.id}`;
+    await node(d,'Match',replayId,{kickoff:m.kickoff,replay:true,sourceMatchId:m.id,competition:m.competition,country:m.country});
+    await node(d,'GameState',`state-${replayId}`,{minute:0,homeGoals:0,awayGoals:0,inputKind:'manual-replay'});
+    await edge(d,'Match',replayId,'HOME_TEAM','Team',m.homeId);
+    await edge(d,'Match',replayId,'AWAY_TEAM','Team',m.awayId);
+    await edge(d,'Match',replayId,'HAS_STATE','GameState',`state-${replayId}`);
   }
   return {matchId:id,historyMatches:dataset.matches.length};
 }

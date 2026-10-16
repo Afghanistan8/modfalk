@@ -46,7 +46,7 @@ test('domain tool dispatch is isolated',async()=>{
 });
 test('forecast rejects future match data and evaluates a chronological holdout',async()=>{
   assert.throws(()=>assertChronology([{kickoff:'2025-01-02',homeGoals:1,awayGoals:0}],'2025-01-01'),/at or after/);
-  const dataset=await loadSports();const metric=evaluateChronologicalHoldout(dataset.matches);assert.ok(metric.holdoutMatches>20);assert.ok(metric.value>=0&&metric.value<=1);
+  const dataset=await loadSports();const metric=evaluateChronologicalHoldout(dataset.matches);assert.ok(metric.holdoutMatches>20);assert.ok(metric.value>=0&&metric.value<=1);assert.ok(dataset.competitions?.some(x=>x.includes('Premier League')));assert.ok(dataset.competitions?.some(x=>x.includes('FIFA World Cup')));
   const target=dataset.matches.find(x=>x.id===dataset.targetId);
   const f=fake({sportsRows:[{matchId:`replay-${target.id}`,kickoff:target.kickoff,homeId:target.homeId,home:target.home,awayId:target.awayId,away:target.away,minute:0,homeGoals:0,awayGoals:0,lineup:['Player A']}],history:dataset.matches}),m=await createGraphMcpClient(f.query);
   try{const result=await runSports(m.client,`replay-${target.id}`,{minute:30,homeGoals:1,awayGoals:0});assert.equal(result.status,'action-proposed');assert.equal(result.forecast.modelVersion,'transparent-form-v1');assert.ok(Math.abs(result.forecast.home+result.forecast.draw+result.forecast.away-1)<1e-9);assert.equal(f.writes[0].domain,'sports');}finally{await m.close();}

@@ -8,6 +8,8 @@
     "seed": "node src/seed.js",
     "prepare:sports": "node src/sports-data.js",
     "import:nws": "node src/nws.js",
+    "import:nws-active": "node src/nws-active.js",
+    "import:public": "node src/public-data.js",
     "test": "node --test test/agents.test.js test/server.test.js",
     "test:integration": "node --test test/integration.test.js"
   },

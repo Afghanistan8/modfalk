@@ -2,25 +2,27 @@
 
 **Submission track:** Agents That Act on Connected Data (Track 01, WeMakeDevs × FalkorDB Graph Hacks: Context for AI Agents).
 
-ModFalk is a local web app with four graph agents. Each agent selects a named MCP tool, traverses a domain-specific FalkorDB graph, and writes an internal action with the evidence and uncertainty that led to it. A reviewer can mark the action reviewed or dismissed. The exact tab labels are **Case Evidence**, **Medical overlook**, **Disaster response**, and **Sports Forcast**.
+ModFalk is a local web app with four graph agents. Each agent selects a named MCP tool, traverses a domain-specific FalkorDB graph, and writes an internal action with the evidence and uncertainty that led to it. A reviewer can mark the action reviewed or dismissed. The exact tab labels are **Case Evidence**, **Medical overlook**, **Disaster response**, and **Sports Forecast**.
 
-The UI follows the owner's supplied monochrome editorial reference: an oversized Modfalk wordmark, narrow grid-framed introduction, and matching agent, result, and review areas. The app fails its decision path when FalkorDB is unavailable. No real case or patient records are used; facility, shelter, road, and capacity records are synthetic.
+The UI follows the owner's supplied monochrome editorial reference: an oversized Modfalk wordmark, narrow grid-framed introduction, and matching agent, result, and review areas. The app fails its decision path when FalkorDB is unavailable. No real case or patient records are used; facility, shelter, road, and capacity records are synthetic. The four tabs are scenarios within Track 01, not separate hackathon tracks. Graph-native agent context supports continuity across runs while the product remains focused on decisions made from connected data.
 
 ## Quick start
 
-Requirements: Node.js 22+ and Docker with Compose. Tested locally with Node 24; this workstation did not have Docker, so the included GitHub Actions workflow is configured to check live database integration after a push.
+Requirements: Node.js 22+ and Docker with Compose. Tested locally with Node 24 and Docker Desktop. The live FalkorDB integration test runs locally; the GitHub Actions workflows are disabled at the owner's request.
 
 ```sh
 docker compose up -d --wait
 npm ci
 npm run prepare:sports
 npm run seed
+npm run import:public
+npm run import:nws-active
 npm start
 ```
 
 Open **http://127.0.0.1:4173**. FalkorDB Browser is at **http://127.0.0.1:3000**. A named Docker volume and append-only persistence retain the graph. `npm run seed` is idempotent for the source nodes and edges; every agent run intentionally creates a new reviewable action. Do not use `docker compose down -v` unless you intend to delete graph data.
 
-For an official live NWS alert and forecast at a point, optionally run `npm run import:nws -- 29.76 -95.36` (replace the latitude and longitude with a US point), then use the returned alert ID in the Disaster response tab. If no active alert is returned, the synthetic scenario remains available. The imported alert and forecast are official; its associated facility, shelter, road, and capacity are expressly synthetic and unverified. The default demo alert and forecast are entirely synthetic.
+For current public data, run `npm run import:public` for DailyMed and FEMA Open Shelters, then `npm run import:nws-active` for official active NWS alerts. The older point importer (`npm run import:nws -- 29.76 -95.36`) also imports an NWS forecast. The graph records source URL, retrieval time, status, and freshness. FEMA capacity is shown only when the public layer supplies it; missing capacity remains unknown. Synthetic replay scenarios remain available for a deterministic demo, and roads/facilities are never presented as verified dispatch instructions.
 
 Verification:
 
@@ -43,6 +45,17 @@ Browser → local HTTP server → domain agent → MCP Client
 
 The Node server and the domain agents are in `src/`. `src/mcp.js` uses the official Model Context Protocol SDK with a linked in-memory transport. This is a real MCP client/server call path, not a direct database call disguised as MCP. Only MCP tool handlers in `src/mcp.js` call `src/db.js` for agent decisions and action writes. The server's health endpoint is a direct connectivity probe, not an agent decision. `src/queries.js` is the reviewed Cypher catalog. The front end uses plain HTML, CSS, and JavaScript in `public/`.
 
+### Track 01 requirements audit
+
+| Hackathon requirement | ModFalk implementation | Proof to show in the demo |
+| --- | --- | --- |
+| FalkorDB is central to the product | Four isolated FalkorDB graphs hold domain records, provenance, findings, actions, reviews, tool invocations, and durable agent context. | Stop FalkorDB and run an agent: the decision fails and no action is written. |
+| Connected data drives the decision | Each agent follows a named multi-hop Cypher path; the disaster agent also ranks graph routes with `algo.SPpaths`. | Open the result's path and Cypher, then compare the cited source nodes. |
+| Agents use graph tools | The server dispatches domain-specific MCP tools; the client cannot choose an arbitrary graph. | Show the selected tool and the tool invocation nodes in the trace. |
+| Memory persists between runs | Prior `Finding`, `Action`, `Review`, `AgentContext`, `ToolInvocation`, and `ContextEvidence` nodes are queried before the next run. | Run the same tab twice and show the **PRIOR GRAPH MEMORY** block. |
+| Decisions are traceable | Every proposed action stores the path, source URLs, displayed passages, uncertainty, tool log, and context evidence; context evidence links back to `Source`. | Use the review queue to inspect the finding, evidence, sources, and reviewer status. |
+| Sources are honest and inspectable | Public DailyMed, NWS, FEMA, and StatsBomb data carry source URLs and retrieval/freshness metadata. Synthetic case/patient records and unverified operational roads are labeled at the record and UI boundary. | Show the source URL and the uncertainty boundary for each scenario. |
+
 FalkorDB holds four separate graphs: `modfalk_case`, `modfalk_medical`, `modfalk_disaster`, and `modfalk_sports`. Domain tool names select the graph server-side, and the client cannot supply an arbitrary graph name. Removing FalkorDB makes tool calls fail and prevents actions; the UI reports it as offline. The `database failure breaks the decision path` unit test checks this explicitly.
 
 ## Graph model and decision paths
@@ -54,7 +67,7 @@ All domains use source provenance and internal workflow nodes. `Source` carries 
 | Case Evidence | `Case → Event ← Statement ← Witness`, with each statement linked to its `Passage → Source` and event-linked exhibits inspected for missing passages | `case_conflicts` and `case_gaps` find divergent claims and missing corroboration, then write a lawyer-review task. |
 | Medical overlook | `Patient → Condition → Source`; `Patient → Medicine → Ingredient`; `Patient → Allergy ← LabelSection → Source` | `medical_contraindications` finds a documented serious allergy concern and writes a clinician-review alert. |
 | Disaster response | `Alert → Zone ← Facility → Road → Shelter → Capacity`, plus `Zone → Forecast → Source` | `disaster_candidates` plus `disaster_shortest_path` writes a prioritized incident-team brief. |
-| Sports Forcast | `Match → Home/Away Team ← HistoricalMatch → Opponent`; `Match → Lineup → Player`; `Match → GameState` | `sports_context` and `sports_history` write a forecast revision after manual game-state input. |
+| Sports Forecast | `Match → Home/Away Team ← HistoricalMatch → Opponent`; `Match → Lineup → Player`; `Match → GameState` | `sports_context` and `sports_history` write a forecast revision after manual game-state input. |
 
 The disaster route ranking calls FalkorDB's [`algo.SPpaths`](https://docs.falkordb.com/algorithms/sppath) with `weightProp: 'distanceKm'`. The distance is a graph route over *synthetic* road edges, not a verified driving route. The current scenario labels roads and capacity unverified. This algorithm is useful because the agent must compare shelter paths across a road network, rather than treating every candidate as equally close. See the full [Cypher catalog](src/queries.js).
 
@@ -86,9 +99,10 @@ The resulting `Finding → Action` is visible in the review queue with a propose
 ## Domain limits and sources
 
 - **Case Evidence:** Records are synthetic. The jurisdiction selector links to current official [US DOJ Justice Manual](https://www.justice.gov/jm/jm-9-5000-issues-related-trials-and-other-court-proceedings), [England and Wales CPS Disclosure Manual](https://www.cps.gov.uk/prosecution-guidance/disclosure-manual), and [Canadian PPSC Deskbook](https://www.ppsc-sppc.gc.ca/eng/pub/fpsd-sfpg/fps-sfp/tpd/p2/ch05.html). The app never decides guilt, admissibility, or a disclosure duty.
-- **Medical overlook:** The synthetic patient has a recorded serious penicillin allergy and current amoxicillin entry. The public [DailyMed amoxicillin label](https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=4fb7837e-964c-4d38-a3a5-b384b1bd6e08), section 4, documents the concern. NLM notes that DailyMed is not a complete list of all FDA-regulated labeling. The [FDA's January 2026 clinical decision-support guidance](https://www.fda.gov/regulatory-information/search-fda-guidance-documents/clinical-decision-support-software) is a review reference. The app never diagnoses, prescribes, changes a dose, or claims safety from an absent warning.
-- **Disaster response:** The [NWS API](https://www.weather.gov/documentation/services-web-api) adapter can import an active official alert and a forecast for the same point, with issue and expiry times. The replayable default alert and forecast and every facility, shelter, road, capacity, and distance are synthetic. No public warning or dispatch is issued.
-- **Sports Forcast:** `npm run prepare:sports` downloads [StatsBomb Open Data](https://github.com/hudl/open-data) for FA Women's Super League seasons 2018/19, 2019/20, 2020/21, and 2023/24. StatsBomb is the data source; their repository requests attribution and logo use for published analysis. The local downloaded dataset is ignored by Git and is re-created during setup. The fixed three-way form model uses a 70/30 time split and reports a multiclass Brier score; the downloaded 457-match snapshot yielded **0.1757** on 138 held-out matches. The selected match is a *historical replay*, and manual game-state changes create new revisions. There is no trusted live sports feed. The model is a transparent baseline, not a betting or certainty claim.
+- **Medical overlook:** The patient and clinical record are explicitly synthetic; the medication evidence is public. `npm run import:public` retrieves current amoxicillin label metadata from the [DailyMed API](https://dailymed.nlm.nih.gov/dailymed/webservices-help/v1/drugname_labeltype_spls_api.cfm), and the graph stores its set ID, publication date, retrieval time, and source URL. The [FDA clinical decision-support guidance](https://www.fda.gov/regulatory-information/search-fda-guidance-documents/clinical-decision-support-software) is a review reference. The app never diagnoses, prescribes, changes a dose, or claims safety from an absent warning.
+- **Disaster response:** The [NWS API](https://www.weather.gov/documentation/services-web-api) adapter imports current official alerts, and `npm run import:public` retrieves the [FEMA Open Shelters](https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/MapServer/0) status and evacuation/post-impact capacity fields when published. Alert and shelter sources are real; any unverified road/facility relationship is clearly labeled, and no public warning or dispatch is issued.
+- **Sports Forecast:** `npm run prepare:sports` downloads [StatsBomb Open Data](https://github.com/hudl/open-data) for the FA Women's Super League, Premier League, La Liga, 1. Bundesliga, Ligue 1, Serie A, and FIFA World Cup. StatsBomb is the data source; their repository requests attribution and logo use for published analysis. The local downloaded dataset is ignored by Git and is re-created during setup. The fixed three-way form model uses a 70/30 time split and reports a multiclass Brier score. The selected matches are historical replays, and manual game-state changes create new revisions. There is no trusted live sports feed. The model is a transparent baseline, not a betting or certainty claim.
+- **Public-data imports:** `npm run import:public` imports current DailyMed label metadata and FEMA Open Shelters records, including published shelter status and evacuation/post-impact capacity when present. `npm run import:nws-active` imports current official NWS alerts. Patient identities, witness statements, and unverified operational routes remain explicitly synthetic or unverified; the public source is never represented as a fabricated fact.
 
 ![StatsBomb logo](https://raw.githubusercontent.com/hudl/open-data/master/img/SB%20-%20Icon%20Lockup%20-%20Colour%20positive.png)
 

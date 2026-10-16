@@ -37,7 +37,7 @@ RETURN p.id AS patientId,co.id AS conditionId,co.name AS condition,
  m.recordedAt AS medicineDate,i.name AS ingredient,a.name AS allergy,
  a.recordedAt AS allergyDate,a.ingestedAt AS allergyIngestedAt,a.recordId AS allergyRecord,
  l.id AS labelId,l.text AS labelText,l.labelDate AS labelDate,
- s.url AS labelUrl,s.retrievedAt AS retrievedAt,s.kind AS sourceKind`;
+ s.url AS labelUrl,s.retrievedAt AS retrievedAt,s.kind AS sourceKind ORDER BY l.labelDateIso DESC`;
 
 export const DISASTER_QUERY = `
 MATCH (a:Alert {id:$id})-[:AFFECTS]->(z:Zone)<-[:LOCATED_IN]-(f:Facility)
@@ -80,6 +80,16 @@ RETURN m.id AS id,m.kickoff AS kickoff,m.homeGoals AS homeGoals,
  m.awayGoals AS awayGoals,h.id AS homeId,a.id AS awayId,
  s.url AS sourceUrl,s.retrievedAt AS retrievedAt,s.kind AS sourceKind ORDER BY kickoff,id`;
 
+export const AGENT_MEMORY_QUERY = `
+MATCH (f:Finding {subjectId:$id})-[:TRIGGERED]->(a:Action)
+OPTIONAL MATCH (f)-[:USED_CONTEXT]->(c:AgentContext)
+OPTIONAL MATCH (c)-[:USED_TOOL]->(t:ToolInvocation)
+OPTIONAL MATCH (c)-[:CITED]->(ce:ContextEvidence)
+RETURN f.id AS findingId,a.id AS actionId,a.kind AS kind,a.status AS status,
+ f.summary AS summary,f.createdAt AS createdAt,c.path AS path,
+ c.uncertaintyJson AS uncertaintyJson,count(DISTINCT t) AS toolCount,
+ count(DISTINCT ce) AS citationCount ORDER BY f.createdAt DESC LIMIT 5`;
+
 export const QUERY_CATALOG = {
   case_conflicts: CASE_QUERY,
   case_gaps: CASE_GAPS_QUERY,
@@ -87,5 +97,6 @@ export const QUERY_CATALOG = {
   disaster_candidates: DISASTER_QUERY,
   disaster_shortest_path: DISASTER_SHORTEST_PATH,
   sports_context: SPORTS_QUERY,
-  sports_history: SPORTS_HISTORY_QUERY
+  sports_history: SPORTS_HISTORY_QUERY,
+  agent_memory: AGENT_MEMORY_QUERY
 };
