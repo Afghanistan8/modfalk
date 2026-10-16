@@ -1,0 +1,115 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:03.311
+ModFalk gives AI agents the context to act.
+
+00:00:03.311 --> 00:00:11.175
+It connects evidence, sources, and memory in Falkor DB, so each result comes with a path you can inspect.
+
+00:00:11.175 --> 00:00:14.900
+Let’s see how that works across four different domains.
+
+00:00:15.306 --> 00:00:16.895
+First, Case Evidence.
+
+00:00:16.895 --> 00:00:21.662
+Choose a case and jurisdiction, then run the agent.
+
+00:00:21.662 --> 00:00:25.370
+It connects events, witnesses, statements, and exhibits.
+
+00:00:25.370 --> 00:00:29.077
+Here, two statements give different arrival times.
+
+00:00:29.077 --> 00:00:36.492
+The result identifies the conflict, links the passages, and proposes a lawyer review task.
+
+00:00:36.492 --> 00:00:39.140
+The cases are generated examples.
+
+00:00:39.140 --> 00:00:45.496
+Official legal guidance covers the United States, England and Wales, and Canada.
+
+00:00:45.902 --> 00:00:47.436
+Next, Medical Overlook.
+
+00:00:47.436 --> 00:00:54.080
+It connects medicines, conditions, and allergies to a public Daily Med drug label.
+
+00:00:54.080 --> 00:00:59.190
+Running it reveals a contraindication supported by the label text.
+
+00:00:59.190 --> 00:01:04.301
+You can inspect the source, connected path, and evidence gaps.
+
+00:01:04.301 --> 00:01:06.856
+These patient records are synthetic.
+
+00:01:06.856 --> 00:01:09.922
+The alert requires a clinician's review.
+
+00:01:10.329 --> 00:01:15.910
+Disaster Response uses National Weather Service alerts and FEMA shelter records.
+
+00:01:15.910 --> 00:01:22.507
+Without verified connections to facilities, routes, and capacity, the agent returns needs evidence.
+
+00:01:22.507 --> 00:01:28.089
+That missing information stays visible, and no response action is created.
+
+00:01:28.495 --> 00:01:32.130
+Now, switch to a clearly labelled example scenario.
+
+00:01:32.130 --> 00:01:38.036
+This demonstrates how facilities, roads, shelters, and capacity can form a response path.
+
+00:01:38.036 --> 00:01:44.852
+The shortest path query is visible here, together with the assumptions that still need checking.
+
+00:01:44.852 --> 00:01:49.395
+Any proposed incident brief remains in the human review queue.
+
+00:01:49.801 --> 00:01:56.624
+For Sports Forecast, select Argentina against France in the twenty twenty two World Cup final.
+
+00:01:56.624 --> 00:02:03.447
+Set the replay to thirty minutes, with Argentina leading one nil, and run the agent.
+
+00:02:03.447 --> 00:02:11.179
+It uses match history and the entered score to calculate home win, draw, and away win probabilities.
+
+00:02:11.179 --> 00:02:17.092
+The result includes its model version, holdout evaluation, source links, and lineup context.
+
+00:02:17.092 --> 00:02:18.911
+These probabilities are uncertain.
+
+00:02:19.318 --> 00:02:21.905
+The context also survives between runs.
+
+00:02:21.905 --> 00:02:28.805
+Earlier findings, citations, and tool calls are stored in Falkor DB and retrieved as graph memory.
+
+00:02:28.805 --> 00:02:32.254
+Below, proposed actions enter a persistent review queue.
+
+00:02:32.254 --> 00:02:35.273
+A person can review or dismiss them.
+
+00:02:35.273 --> 00:02:43.898
+You can also inspect the actual queries behind the result, tracing the evidence from the source to the proposed action.
+
+00:02:44.304 --> 00:02:50.311
+That’s ModFalk: connected data, persistent memory, and decisions you can trace.
+
+00:02:50.311 --> 00:02:53.587
+Four agents, with one shared approach.
+
+00:02:53.587 --> 00:02:55.225
+Follow the source.
+
+00:02:55.225 --> 00:02:56.863
+Show the path.
+
+00:02:56.863 --> 00:02:59.594
+Keep the human in control.

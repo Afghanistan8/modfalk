@@ -4,3 +4,10 @@ node_modules/
 coverage/
 data/
 *.log
+
+# Publish the approved demo; keep draft captures and rendering intermediates local.
+demo-video/*
+!demo-video/ModFalk-demo-v2.mp4
+!demo-video/ModFalk-demo-v2.vtt
+!demo-video/narration-v2.json
+!demo-video/README.md
