@@ -21,6 +21,7 @@ async function seedCase() {
     {id:'case-003',name:'Transit handoff timeline',eventId:'event-003',eventTitle:'Parcel handoff',eventDate:'2026-09-25',claimKey:'handoff-time',values:['14:15','14:50'],exhibit:'dispatch-log',exhibitText:'Synthetic dispatch log; author not yet corroborated'}
   ];
   await runQuery(d,`MATCH (n) WHERE n.id IN $ids DETACH DELETE n`,{ids:['statement-a','statement-b','witness-a','witness-b','passage-a','passage-b','assertion-statement-a','assertion-statement-b','source-passage-a','source-passage-b']},false);
+  await runQuery(d,`MATCH (f:Finding)-[:TRIGGERED]->(a:Action) WHERE f.evidenceJson CONTAINS 'statement-a' OR f.evidenceJson CONTAINS 'statement-b' DETACH DELETE f,a`,{},false);
   await runQuery(d,`MATCH (c:Case)-[r:HAS_EVENT]->() WHERE c.id IN $ids DELETE r`,{ids:cases.map(c=>c.id)},false);
   for(const [caseIndex,item] of cases.entries()){
     await node(d,'Case',item.id,{name:item.name,synthetic:true});
