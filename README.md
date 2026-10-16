@@ -24,6 +24,10 @@ Open **http://127.0.0.1:4173**. FalkorDB Browser is at **http://127.0.0.1:3000**
 
 To use FalkorDB Cloud, copy `.env.example` to `.env` and fill in the host, port, username, password, and TLS flag from the instance's **Connectivity** tab. `.env` is ignored by Git and must never be committed. The app loads these values automatically; no credentials are required in the chat.
 
+### Vercel deployment
+
+The repository includes `api/index.js`, a Vercel-compatible adapter for the Node server. In the Vercel import screen, keep the **Node** preset and project root `./`, then add `FALKORDB_HOST`, `FALKORDB_PORT`, `FALKORDB_USERNAME`, `FALKORDB_PASSWORD`, and `FALKORDB_TLS` under **Environment Variables** for Preview and Production. Deploy only after those values are set; the password must be entered directly in Vercel and must not be committed.
+
 For current public data, run `npm run import:public` for DailyMed and FEMA Open Shelters, then `npm run import:nws-active` for official active NWS alerts. The older point importer (`npm run import:nws -- 29.76 -95.36`) also imports an NWS forecast. The graph records source URL, retrieval time, status, and freshness. FEMA capacity is shown only when the public layer supplies it; missing capacity remains unknown. Synthetic replay scenarios remain available for a deterministic demo, and roads/facilities are never presented as verified dispatch instructions.
 
 Verification:
