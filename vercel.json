@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "node",
+  "functions": {
+    "src/server.js": {
+      "includeFiles": "{public/**,src/sports-snapshot.json}"
+    }
+  }
+}

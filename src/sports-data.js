@@ -8,6 +8,7 @@ const COMPETITIONS=[
   [2,27,'Premier League','England'],[11,27,'La Liga','Spain'],[9,281,'1. Bundesliga','Germany'],[7,235,'Ligue 1','France'],[12,27,'Serie A','Italy'],[43,106,'FIFA World Cup','International']
 ];
 export const SPORTS_FILE=new URL('../data/sports.json',import.meta.url);
+const DEPLOYED_SPORTS_FILE=new URL('./sports-snapshot.json',import.meta.url);
 
 async function fetchJson(url) {
   const response=await fetch(url,{headers:{'User-Agent':'ModFalk/0.1 (hackathon demo)'}});
@@ -34,7 +35,11 @@ export async function prepareSports() {
 
 export async function loadSports() {
   try{return JSON.parse(await readFile(SPORTS_FILE,'utf8'));}
-  catch(e){if(e.code==='ENOENT')throw new Error('Sports dataset missing. Run npm run prepare:sports first.');throw e;}
+  catch(e){
+    if(e.code!=='ENOENT')throw e;
+    try{return JSON.parse(await readFile(DEPLOYED_SPORTS_FILE,'utf8'));}
+    catch(fallbackError){if(fallbackError.code==='ENOENT')throw new Error('Sports dataset missing. Run npm run prepare:sports first.');throw fallbackError;}
+  }
 }
 
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]) {

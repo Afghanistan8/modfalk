@@ -55,6 +55,13 @@ export async function createAppServer(options={}) {
   return {server,handler,close:async()=>{await new Promise(resolve=>server.close(resolve));await mcp.close();if(!options.query)await closeDb();}};
 }
 
+let functionApp;
+export default async function vercelHandler(req,res) {
+  functionApp ||= createAppServer();
+  const {handler}=await functionApp;
+  return handler(req,res);
+}
+
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
   createAppServer().then(({server})=>server.listen(Number(process.env.PORT||4173),'127.0.0.1',()=>console.log(`ModFalk: http://127.0.0.1:${server.address().port}`))).catch(e=>{console.error(e);process.exitCode=1;});
 }
