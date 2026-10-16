@@ -59,6 +59,11 @@ export async function runDisaster(client,alertId) {
   if(!rows?.length)return {status:'no-finding',message:'No exposed facility and shelter path found.',toolLog:log};
   const active=Date.parse(rows[0].expiresAt)>Date.now();
   if(!active)return {status:'needs-evidence',message:'Alert has expired. Refresh official alert data before drafting a current brief.',toolLog:log};
+  if(rows[0].origin==='official'&&rows.some(r=>r.zoneVerifiedGeo!==true||r.facilityVerifiedGeo!==true||r.shelterVerifiedGeo!==true||r.roadStatus!=='open'||!r.roadVerifiedAt||!r.capacityVerifiedAt)){
+    const ev=evidence(rows.map(r=>`Alert ${r.alertId} → Zone ${r.zoneId} → Facility ${r.facilityId} → Road ${r.roadId} → Shelter ${r.shelterId}`).join('\n'),[citation(rows[0].sourceUrl,rows[0].alertId,rows[0].headline,rows[0].issuedAt,rows[0].retrievedAt,rows[0].sourceKind||'official-NWS-alert')],['The alert is official, but the facility, shelter, route or capacity connection lacks independent geographic and operational verification.']);
+    ev.memory=priorMemory;
+    return {status:'needs-evidence',message:'Official alert found, but its response path is unverified. No incident brief was created.',evidence:ev,toolLog:log,issuedAt:rows[0].issuedAt,expiresAt:rows[0].expiresAt,origin:rows[0].origin};
+  }
   const ranked=[...rows].sort((a,b)=>Number(b.priority)-Number(a.priority));
   const routeLog=toolLog('disaster_shortest_path','Weighted shortest path ranks candidate shelter routes by graph distance.',QUERY_CATALOG.disaster_shortest_path);
   for(const r of ranked){const result=await callGraphTool(client,routeLog.tool,{facilityId:r.facilityId,shelterId:r.shelterId});r.route=result.rows?.[0]||null;}

@@ -38,6 +38,10 @@ test('fresh synthetic allergy and label create clinician alert; stale record blo
 test('disaster path invokes FalkorDB shortest-path algorithm and labels uncertainty',async()=>{
   const f=fake(),m=await createGraphMcpClient(f.query);try{const result=await runDisaster(m.client,'a1');assert.equal(result.status,'action-proposed');assert.equal(result.toolLog[1].tool,'disaster_shortest_path');assert.equal(result.routes[0].distanceKm,5);assert.ok(result.evidence.uncertainty.some(x=>x.includes('unverified')));}finally{await m.close();}
 });
+test('official alert cannot create a brief through an unverified response path',async()=>{
+  const f=fake({disasterRows:[{...disasterRow,origin:'official',sourceUrl:'https://api.weather.gov/alerts/example'}]}),m=await createGraphMcpClient(f.query);
+  try{const result=await runDisaster(m.client,'a1');assert.equal(result.status,'needs-evidence');assert.match(result.message,/unverified/);assert.equal(f.writes.length,0);}finally{await m.close();}
+});
 test('database failure breaks the decision path and creates no action',async()=>{
   const m=await createGraphMcpClient(async()=>{throw new Error('database offline');});try{await assert.rejects(()=>runCase(m.client,'case-001'),/database offline/);}finally{await m.close();}
 });
