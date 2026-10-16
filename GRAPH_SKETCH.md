@@ -1,4 +1,4 @@
-# ModFalk graph sketches — pre-event, conceptual only
+# ModFalk original graph sketches — historical planning reference
 
 These are allowable graph-model sketches, not a built application or final schema. Revisit after the event opens and the user asks to continue.
 
@@ -20,7 +20,7 @@ Conceptual path: `SyntheticPatient → CurrentMedicine → Ingredient → LabelS
 
 Conceptual path: `OfficialAlert → AffectedArea → SyntheticFacility → AccessRoad → CandidateShelter → Capacity/Resource`. The graph should distinguish official alert facts from synthetic facility and shelter status. A route or shelter with unverified live status remains a candidate and produces a gap in the incident-team brief, not a dispatch recommendation.
 
-## Sports Forcast
+## Sports Forecast
 
 Conceptual path: `Match → Home/AwayTeam → PriorMatch → Opponent`, plus `Match → Lineup → Player` and `Match → GameState`. Historical matches and lineups may come from a permitted public dataset. A manual lineup or game-state change creates a forecast revision that records the input delta, model version, timestamp, coverage, probability quality, and a three-way win/draw/loss distribution. Training and calibration must use only information known before each forecast time.
 

@@ -15,28 +15,35 @@ export async function edge(domain,fromLabel,fromId,type,toLabel,toId,props={}) {
 
 async function seedCase() {
   const d='case';
-  await node(d,'Case','case-001',{name:'Warehouse camera timeline',synthetic:true});
-  await node(d,'Event','event-001',{title:'Loading bay arrival',eventAt:'2026-09-21T18:40:00Z',synthetic:true});
-  await edge(d,'Case','case-001','HAS_EVENT','Event','event-001');
-  for(const [id,name] of [['witness-a','Morgan Vale'],['witness-b','Samir Bell']])await node(d,'Witness',id,{name,synthetic:true});
-  const records=[
-    ['statement-a','witness-a','18:40','passage-a','Synthetic interview record A says the van arrived at 18:40.'],
-    ['statement-b','witness-b','19:10','passage-b','Synthetic interview record B says the van arrived at 19:10.']
+  const cases=[
+    {id:'case-001',name:'Warehouse camera timeline',eventId:'event-001',eventTitle:'Loading bay arrival',eventDate:'2026-09-21',claimKey:'arrival-time',values:['18:40','19:10'],exhibit:'camera-log',exhibitText:'Synthetic camera clock log; time sync unverified'},
+    {id:'case-002',name:'Port arrival timeline',eventId:'event-002',eventTitle:'Container inspection',eventDate:'2026-09-23',claimKey:'inspection-time',values:['07:25','08:05'],exhibit:'gate-scan',exhibitText:'Synthetic port gate scan; device clock provenance missing'},
+    {id:'case-003',name:'Transit handoff timeline',eventId:'event-003',eventTitle:'Parcel handoff',eventDate:'2026-09-25',claimKey:'handoff-time',values:['14:15','14:50'],exhibit:'dispatch-log',exhibitText:'Synthetic dispatch log; author not yet corroborated'}
   ];
-  for(const [id,witness,value,passage,text] of records){
-    await node(d,'Statement',id,{claimKey:'arrival-time',claimValue:value,recordedAt:'2026-09-22T10:00:00Z',identityConfidence:0.98,synthetic:true});
-    await node(d,'Assertion',`assertion-${id}`,{claimKey:'arrival-time',claimValue:value,eventAt:`2026-09-21T${value}:00Z`,recordedAt:'2026-09-22T10:00:00Z',ingestedAt:stamp,classification:'synthetic-fact'});
+  await runQuery(d,`MATCH (n) WHERE n.id IN $ids DETACH DELETE n`,{ids:['statement-a','statement-b','witness-a','witness-b','passage-a','passage-b','assertion-statement-a','assertion-statement-b','source-passage-a','source-passage-b']},false);
+  await runQuery(d,`MATCH (c:Case)-[r:HAS_EVENT]->() WHERE c.id IN $ids DELETE r`,{ids:cases.map(c=>c.id)},false);
+  for(const [caseIndex,item] of cases.entries()){
+    await node(d,'Case',item.id,{name:item.name,synthetic:true});
+    await node(d,'Event',item.eventId,{title:item.eventTitle,eventAt:`${item.eventDate}T${item.values[0]}:00Z`,synthetic:true});
+    await edge(d,'Case',item.id,'HAS_EVENT','Event',item.eventId);
+    for(const witnessIndex of [0,1]){
+      const suffix=`${caseIndex+1}-${witnessIndex+1}`,witness=`witness-${suffix}`,id=`statement-${suffix}`,passage=`passage-${suffix}`,value=item.values[witnessIndex];
+      await node(d,'Witness',witness,{name:`Synthetic Witness ${caseIndex+1}${String.fromCharCode(65+witnessIndex)}`,synthetic:true});
+      const text=`Synthetic interview record says the ${item.eventTitle.toLowerCase()} occurred at ${value}.`;
+      await node(d,'Statement',id,{claimKey:item.claimKey,claimValue:value,recordedAt:`${item.eventDate}T17:00:00Z`,identityConfidence:0.98,synthetic:true});
+      await node(d,'Assertion',`assertion-${id}`,{claimKey:item.claimKey,claimValue:value,eventAt:`${item.eventDate}T${value}:00Z`,recordedAt:`${item.eventDate}T17:00:00Z`,ingestedAt:stamp,classification:'synthetic-fact'});
     await node(d,'Passage',passage,{text,recordId:passage,ingestedAt:stamp,kind:'synthetic-fact'});
-    await node(d,'Source',`source-${passage}`,{url:`synthetic://case-001/${passage}`,retrievedAt:stamp,kind:'synthetic-case-evidence'});
+      await node(d,'Source',`source-${passage}`,{url:`synthetic://${item.id}/${passage}`,retrievedAt:stamp,kind:'synthetic-case-evidence'});
     await edge(d,'Witness',witness,'GAVE','Statement',id);
-    await edge(d,'Statement',id,'ABOUT','Event','event-001');
+      await edge(d,'Statement',id,'ABOUT','Event',item.eventId);
     await edge(d,'Statement',id,'EXPRESSES','Assertion',`assertion-${id}`);
     await edge(d,'Assertion',`assertion-${id}`,'FROM_SOURCE','Source',`source-${passage}`);
     await edge(d,'Statement',id,'SUPPORTED_BY','Passage',passage);
     await edge(d,'Passage',passage,'FROM_SOURCE','Source',`source-${passage}`);
+    }
+    await node(d,'Exhibit',item.exhibit,{description:item.exhibitText,synthetic:true});
+    await edge(d,'Exhibit',item.exhibit,'ABOUT','Event',item.eventId);
   }
-  await node(d,'Exhibit','camera-log',{description:'Synthetic camera clock log; time sync unverified',synthetic:true});
-  await edge(d,'Exhibit','camera-log','ABOUT','Event','event-001');
   for(const [code,title,url,date] of [
     ['US','Justice Manual 9-5.001','https://www.justice.gov/jm/jm-9-5000-issues-related-trials-and-other-court-proceedings','retrieved 2026-10-15'],
     ['EW','CPS Disclosure Manual','https://www.cps.gov.uk/prosecution-guidance/disclosure-manual','2022-07-14'],
@@ -44,10 +51,6 @@ async function seedCase() {
     await node(d,'Guidance',`guidance-${code}`,{jurisdiction:code,title,date,kind:'guidance'});
     await node(d,'Source',`guidance-source-${code}`,{url,retrievedAt:stamp,kind:'official-guidance'});
     await edge(d,'Guidance',`guidance-${code}`,'FROM_SOURCE','Source',`guidance-source-${code}`);
-  }
-  for(const [id,name] of [['case-002','Port arrival timeline'],['case-003','Transit handoff timeline']]){
-    await node(d,'Case',id,{name,synthetic:true});
-    await edge(d,'Case',id,'HAS_EVENT','Event','event-001');
   }
 }
 
@@ -58,7 +61,7 @@ async function seedMedical() {
   await node(d,'Medicine','amoxicillin',{name:'Amoxicillin',recordedAt:date,synthetic:true});
   await node(d,'Ingredient','amoxicillin-ingredient',{name:'amoxicillin'});
   await node(d,'Allergy','penicillin',{name:'penicillin',severity:'serious',recordedAt:date,ingestedAt:stamp,recordId:'synthetic-allergy-001',synthetic:true});
-  await node(d,'LabelSection','amoxicillin-4',{text:'to amoxicillin or to other beta-lactams (e.g., penicillins or cephalosporins).',labelDate:'2026-03-01',labelDateIso:'2026-03-01',warningKind:'contraindication',recordId:'section-4'});
+  await node(d,'LabelSection','amoxicillin-4',{text:'Amoxicillin is contraindicated in patients who have experienced a serious hypersensitivity reaction to amoxicillin or to other beta-lactams (e.g., penicillins or cephalosporins).',labelDate:'2026-03-01',labelDateIso:'2026-03-01',warningKind:'contraindication',recordId:'section-4',verifiedText:true});
   await node(d,'Assertion','allergy-assertion-001',{claimKey:'serious-allergy',claimValue:'penicillin',eventAt:date,ingestedAt:stamp,classification:'synthetic-fact'});
   await node(d,'Assertion','condition-assertion-001',{claimKey:'recorded-condition',claimValue:'infection, type unspecified',eventAt:date,ingestedAt:stamp,classification:'synthetic-fact'});
   await node(d,'Assertion','label-assertion-001',{claimKey:'contraindication',claimValue:'serious beta-lactam hypersensitivity',eventAt:'2026-03-01',ingestedAt:stamp,classification:'source-fact'});
@@ -91,7 +94,7 @@ async function seedDisaster() {
   await node(d,'Alert','scenario-flood-001',{headline:'Synthetic flash-flood scenario for graph demonstration',issuedAt,expiresAt,status:'scenario',origin:'synthetic'});
   await node(d,'Assertion','alert-assertion-001',{claimKey:'hazard',claimValue:'synthetic flash-flood scenario',eventAt:issuedAt,ingestedAt:stamp,classification:'synthetic-fact'});
   await node(d,'Source','scenario-source',{url:'synthetic://disaster/flood-scenario-001',retrievedAt:stamp,kind:'synthetic-scenario'});
-  await node(d,'Zone','zone-001',{name:'Synthetic Creek Zone'});
+  await node(d,'Zone','zone-001',{name:'Synthetic Creek Zone',synthetic:true,verifiedGeo:false});
   await node(d,'Facility','clinic-001',{name:'Creekside Clinic',priority:3,synthetic:true});
   await node(d,'Facility','school-001',{name:'North School',priority:2,synthetic:true});
   await node(d,'Road','road-a',{name:'Bridge Road',status:'unknown',verifiedAt:''});
@@ -156,7 +159,8 @@ async function seedSports() {
       await edge(d,'Lineup',`lineup-${id}`,'INCLUDES','Player',String(p.player_id));
     }
   }
-  const replayMatches=[target,...[...new Map(dataset.matches.map(m=>[m.competition,m])).values()].slice(0,10)].filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i);
+  const order=['FIFA World Cup','Premier League','La Liga','Serie A','1. Bundesliga','Ligue 1',"FA Women's Super League"];
+  const replayMatches=[target,...order.map(name=>dataset.matches.filter(m=>m.competition===name).at(-1))].filter(Boolean).filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i);
   for(const m of replayMatches){
     const replayId=`replay-${m.id}`;
     await node(d,'Match',replayId,{kickoff:m.kickoff,replay:true,sourceMatchId:m.id,competition:m.competition,country:m.country});
@@ -168,9 +172,10 @@ async function seedSports() {
   return {matchId:id,historyMatches:dataset.matches.length};
 }
 
-export async function seedAll() {
-  await seedCase();await seedMedical();await seedDisaster();const sports=await seedSports();
-  return {case:'case-001',medical:'patient-001',disaster:'scenario-flood-001',sports};
+export async function seedCore() {
+  await seedCase();await seedMedical();await seedDisaster();
+  return {case:'case-001',medical:'patient-001',disaster:'scenario-flood-001'};
 }
+export async function seedAll() {return {...await seedCore(),sports:await seedSports()};}
 
-if(process.argv[1]?.endsWith('seed.js'))seedAll().then(x=>console.log(JSON.stringify(x,null,2))).catch(e=>{console.error(e);process.exitCode=1;}).finally(closeDb);
+if(process.argv[1]?.endsWith('seed.js'))(process.argv.includes('--core-only')?seedCore():seedAll()).then(x=>console.log(JSON.stringify(x,null,2))).catch(e=>{console.error(e);process.exitCode=1;}).finally(closeDb);

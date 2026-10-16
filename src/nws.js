@@ -1,5 +1,5 @@
 import { node, edge } from './seed.js';
-import { closeDb } from './db.js';
+import { closeDb, runQuery } from './db.js';
 
 export async function importNws(latitude=29.76,longitude=-95.36) {
   const lat=Number(latitude),lon=Number(longitude);
@@ -52,7 +52,7 @@ export async function importActiveNws(limit=5) {
     await node('disaster','Alert',id,{headline:p.headline||p.event,issuedAt:p.sent||p.effective,expiresAt:p.expires,status:p.status||'actual',origin:'official',areaDesc:p.areaDesc});
     await node('disaster','Source',`source-${id}`,{url:sourceUrl,retrievedAt:new Date().toISOString(),kind:'official-NWS-alert'});
     await edge('disaster','Alert',id,'FROM_SOURCE','Source',`source-${id}`);
-    await edge('disaster','Alert',id,'AFFECTS','Zone','zone-001');
+    await runQuery('disaster',`MATCH (a:Alert {id:$id})-[r:AFFECTS]->(z:Zone {synthetic:true}) DELETE r`,{id},false);
     imported.push({id,headline:p.headline||p.event,area:p.areaDesc,expiresAt:p.expires,sourceUrl});
   }
   return {source:url,imported};

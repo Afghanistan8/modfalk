@@ -30,7 +30,7 @@ MATCH (p)-[:HAS_CONDITION]->(co:Condition)-[:FROM_SOURCE]->(ps:Source)
 MATCH (p)-[:HAS_ALLERGY]->(a:Allergy)
 MATCH (m)-[:HAS_LABEL]->(l:LabelSection)-[:WARNS_ABOUT]->(a)
 MATCH (l)-[:FROM_SOURCE]->(s:Source)
-WHERE a.severity = 'serious' AND l.warningKind = 'contraindication'
+WHERE a.severity = 'serious' AND l.warningKind = 'contraindication' AND l.verifiedText = true
 RETURN p.id AS patientId,co.id AS conditionId,co.name AS condition,
  co.recordedAt AS conditionDate,ps.url AS patientSourceUrl,ps.retrievedAt AS patientRetrievedAt,
  m.id AS medicineId,m.name AS medicine,
@@ -40,10 +40,10 @@ RETURN p.id AS patientId,co.id AS conditionId,co.name AS condition,
  s.url AS labelUrl,s.retrievedAt AS retrievedAt,s.kind AS sourceKind ORDER BY l.labelDateIso DESC`;
 
 export const DISASTER_QUERY = `
-MATCH (a:Alert {id:$id})-[:AFFECTS]->(z:Zone)<-[:LOCATED_IN]-(f:Facility)
-MATCH (f)-[:USES_ROAD]->(r:Road)-[:LEADS_TO]->(s:Shelter)
-MATCH (s)-[:HAS_CAPACITY]->(c:Capacity)
-MATCH (a)-[:FROM_SOURCE]->(src:Source)
+MATCH (a:Alert {id:$id})-[:FROM_SOURCE]->(src:Source)
+OPTIONAL MATCH (a)-[:AFFECTS]->(z:Zone)<-[:LOCATED_IN]-(f:Facility)
+OPTIONAL MATCH (f)-[:USES_ROAD]->(r:Road)-[:LEADS_TO]->(s:Shelter)
+OPTIONAL MATCH (s)-[:HAS_CAPACITY]->(c:Capacity)
 OPTIONAL MATCH (z)-[:HAS_FORECAST]->(fc:Forecast)-[:FROM_SOURCE]->(fs:Source)
 RETURN a.id AS alertId,a.headline AS headline,a.issuedAt AS issuedAt,
  a.expiresAt AS expiresAt,a.status AS alertStatus,a.origin AS origin,

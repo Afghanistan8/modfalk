@@ -24,7 +24,7 @@ export async function prepareSports() {
     .sort((a,b)=>a.kickoff.localeCompare(b.kickoff)||a.id.localeCompare(b.id));
   const seen=new Set(),unique=matches.filter(m=>!seen.has(m.id)&&seen.add(m.id));
   if(unique.length<20)throw new Error('The selected public dataset is too small for evaluation');
-  const target=unique[Math.floor(unique.length*0.82)];
+  const target=unique.find(m=>m.competition==='FIFA World Cup'&&m.home==='Argentina'&&m.away==='France')||unique[Math.floor(unique.length*0.82)];
   let lineup=[];
   try {lineup=await fetchJson(`${ROOT}/lineups/${target.id}.json`);} catch(error){console.error(`Lineup unavailable for ${target.id}: ${error.message}`);}
   const dataset={source:'StatsBomb Open Data',sourceUrl:'https://github.com/hudl/open-data',retrievedAt:new Date().toISOString(),competitions:[...new Set(unique.map(m=>`${m.competition} (${m.country})`))],matches:unique,targetId:target.id,lineup};

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
-    "seed": "node src/seed.js",
+    "seed": "npm run seed:core && npm run seed:cloud",
+    "seed:core": "node src/seed.js --core-only",
     "seed:cloud": "node src/seed-cloud.js",
     "prepare:sports": "node src/sports-data.js",
     "import:nws": "node src/nws.js",

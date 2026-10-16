@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seedAll } from '../src/seed.js';
+import { seedCore } from '../src/seed.js';
+import { seedSportsCloud } from '../src/seed-cloud.js';
+import { loadSports } from '../src/sports-data.js';
 import { createGraphMcpClient, callGraphTool } from '../src/mcp.js';
 import { runCase, runMedical, runDisaster, runSports } from '../src/agents.js';
 import { closeDb } from '../src/db.js';
 
 test('FalkorDB-backed paths produce all four actions through MCP and support review',async()=>{
-  const ids=await seedAll();const m=await createGraphMcpClient();
+  const core=await seedCore(),sportsData=await loadSports();await seedSportsCloud();const ids={...core,sports:{matchId:`replay-${sportsData.targetId}`}},m=await createGraphMcpClient();
   try {
     const results=[await runCase(m.client,ids.case,'US'),await runMedical(m.client,ids.medical),await runDisaster(m.client,ids.disaster),await runSports(m.client,ids.sports.matchId,{minute:30,homeGoals:1,awayGoals:0})];
     assert.deepEqual(results.map(r=>r.status),['action-proposed','action-proposed','action-proposed','action-proposed']);
