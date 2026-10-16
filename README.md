@@ -4,7 +4,7 @@
 
 ModFalk is a local web app with four graph agents. Each agent selects a named MCP tool, traverses a domain-specific FalkorDB graph, and writes an internal action with the evidence and uncertainty that led to it. A reviewer can mark the action reviewed or dismissed. The exact tab labels are **Case Evidence**, **Medical overlook**, **Disaster response**, and **Sports Forcast**.
 
-The UI is deliberately simple so it can be replaced with the owner's final design. The app fails its decision path when FalkorDB is unavailable. No real case or patient records are used; facility, shelter, road, and capacity records are synthetic.
+The UI follows the owner's supplied monochrome editorial reference: an oversized Modfalk wordmark, narrow grid-framed introduction, and matching agent, result, and review areas. The app fails its decision path when FalkorDB is unavailable. No real case or patient records are used; facility, shelter, road, and capacity records are synthetic.
 
 ## Quick start
 
@@ -29,7 +29,7 @@ npm test
 npm run test:integration
 ```
 
-Run integration tests after starting FalkorDB, preparing sports data, and seeding. The integration test calls all four agents through MCP, verifies their persisted actions, and reviews one action. The unit suite tests missing citations, weak identity matches, stale medical data, domain isolation, graph failure, and forecast leakage. The [GitHub Actions workflow](.github/workflows/integration.yml) runs both suites against FalkorDB on push.
+Run integration tests after starting FalkorDB, preparing sports data, and seeding. The integration test calls all four agents through MCP, verifies their persisted actions, and reviews one action. The unit suite tests missing citations, weak identity matches, stale medical data, domain isolation, graph failure, and forecast leakage. The [GitHub Actions workflow](.github/workflows/integration.yml) is retained for reference but disabled in GitHub at the owner's request; use the local commands above for verification.
 
 ## Architecture
 
@@ -96,6 +96,6 @@ The sports model uses only matches with kickoff earlier than the replay match fo
 
 ## Demo and submission status
 
-Use [DEMO_CAPTURE.md](DEMO_CAPTURE.md) to record all four tabs and actions. **A working demo video is still required and has not been recorded.** No live deployment or hackathon submission has been made. Local setup is provided in this README. The repository author and owner is **Afghanistan8**. An AI coding assistant (Codex) was used to draft implementation and documentation; it is not a Git coauthor or contributor. The participant must personally run the demo, inspect the graph and source claims, verify the code and model, and be able to explain the architecture and query choices before submission. The final UI design is still pending from the owner.
+Use [DEMO_CAPTURE.md](DEMO_CAPTURE.md) to record all four tabs and actions. **A working demo video is still required and has not been recorded.** No live deployment or hackathon submission has been made. Local setup is provided in this README. The repository author and owner is **Afghanistan8**. An AI coding assistant (Codex) was used to draft implementation and documentation; it is not a Git coauthor or contributor. The participant must personally run the demo, inspect the graph and source claims, verify the code and model, and be able to explain the architecture and query choices before submission.
 
 The rules and schedule were last checked on 2026-10-15: [rules](https://www.wemakedevs.org/hackathons/falkordb/rules), [schedule](https://www.wemakedevs.org/hackathons/falkordb/schedule). Review them again before submission.

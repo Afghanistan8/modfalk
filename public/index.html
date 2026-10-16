@@ -1,11 +1,87 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ModFalk — connected decisions</title><meta name="description" content="Four graph agents with traceable internal actions"><link rel="stylesheet" href="/styles.css"></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e9e9e9">
+  <title>Modfalk — connected evidence</title>
+  <meta name="description" content="Four FalkorDB graph agents with evidence trails and human-reviewed actions">
+  <link rel="stylesheet" href="/styles.css">
+</head>
 <body>
-  <header class="topbar"><div class="brand"><span class="mark">M<span>✦</span></span><div><strong>ModFalk</strong><small>GRAPH INTELLIGENCE WORKBENCH</small></div></div><div class="top-right"><span class="track">TRACK 01 · AGENTS THAT ACT ON CONNECTED DATA</span><span id="db-status" class="status">Checking FalkorDB…</span></div></header>
-  <main><section class="intro"><div><p class="eyebrow">CONNECTED CONTEXT / REVIEWABLE ACTIONS</p><h1>See the path.<br><em>Review the action.</em></h1><p>Four focused agents trace source-backed graph paths through FalkorDB, then draft internal actions for a human to review.</p></div><div class="intro-aside"><div class="num">04</div><div>DOMAIN AGENTS<br>ONE EVIDENCE STANDARD</div></div></section>
-  <nav id="tabs" role="tablist" aria-label="ModFalk agents"><button role="tab" aria-selected="true" data-domain="case">Case Evidence</button><button role="tab" aria-selected="false" data-domain="medical">Medical overlook</button><button role="tab" aria-selected="false" data-domain="disaster">Disaster response</button><button role="tab" aria-selected="false" data-domain="sports">Sports Forcast</button></nav>
-  <section class="workspace"><div class="left"><div class="section-title"><span>01 / INPUT</span><span id="domain-tag">SYNTHETIC CASE</span></div><h2 id="agent-title">Case Evidence</h2><p id="agent-description">Compare statements and exhibits connected to the same synthetic event. Findings become lawyer-review tasks.</p><form id="agent-form"><label for="record-id">Select record</label><select id="record-id" required></select><div id="custom-wrap" hidden><label for="custom-id">Or enter an imported NWS alert ID</label><input id="custom-id" type="text" placeholder="nws-…"></div><div id="case-extra"><label for="jurisdiction">Guidance jurisdiction</label><select id="jurisdiction"><option value="US">United States</option><option value="EW">England and Wales</option><option value="CA">Canada</option></select></div><div id="sports-extra" hidden><div class="field-grid"><div><label for="minute">Manual minute</label><input id="minute" type="number" min="0" max="90" value="0"></div><div><label for="home-goals">Home goals</label><input id="home-goals" type="number" min="0" max="20" value="0"></div><div><label for="away-goals">Away goals</label><input id="away-goals" type="number" min="0" max="20" value="0"></div></div><p class="hint">Historical replay. Changing the score or minute creates a new forecast revision.</p></div><button id="run" type="submit">Run graph agent <span>↗</span></button></form><div class="boundary"><strong>Human review boundary</strong><p id="boundary-text">This agent highlights records. It does not decide guilt, admissibility, or disclosure duty.</p></div></div>
-  <div class="right"><div class="section-title"><span>02 / GRAPH RESULT</span><span id="result-state">WAITING FOR INPUT</span></div><div id="result" class="empty"><span class="empty-icon">✧</span><h3>No investigation yet</h3><p>Select the demo record and run the agent to see its path, sources, and internal action.</p></div></div></section>
-  <section class="activity"><div class="section-title"><span>03 / REVIEW QUEUE</span><span>FALKORDB PERSISTED</span></div><div id="actions" class="actions"><p class="muted">Run an agent to populate the review queue.</p></div></section>
-  </main><footer><span>ModFalk · synthetic and public demonstration data</span><span>No public warnings, clinical orders, legal determinations, or live sports feed.</span></footer><script type="module" src="/app.js"></script>
-</body></html>
+  <div class="site" id="top">
+    <header class="hero" aria-label="Modfalk introduction">
+      <div class="wordmark" aria-label="Modfalk">
+        <span class="wordmark-ghost" aria-hidden="true">MODFALK</span>
+        <span class="wordmark-ink" aria-hidden="true">MODFALK</span>
+      </div>
+      <div class="hero-frame">
+        <nav class="hero-nav" aria-label="Page navigation">
+          <a class="nav-mark" href="#top" aria-label="Modfalk home">+</a>
+          <span class="nav-name">Modfalk<br><small>Connected evidence</small></span>
+          <a href="#agents">Agents <sup>01</sup></a>
+          <a href="#workspace">Workspace <sup>02</sup></a>
+          <a href="#reviews">Reviews <sup>03</sup></a>
+          <span id="db-status" class="status" role="status" aria-live="polite">Checking FalkorDB…</span>
+        </nav>
+        <div class="hero-body">
+          <div class="hero-note">
+            <span class="micro-label">01 / Connected context</span>
+            <p>Follow the source.<br>Keep the human in control.</p>
+          </div>
+          <div class="hero-message">
+            <span class="micro-label">Modfalk / Four graph agents</span>
+            <p>Evidence moves through a graph.<br>Decisions stay reviewable.</p>
+          </div>
+        </div>
+        <div class="hero-foot">
+          <span>Four domains. One traceable standard.</span>
+          <a href="#agents">Explore the agents <span aria-hidden="true">↘</span></a>
+        </div>
+      </div>
+      <a class="scroll-symbol" href="#agents" aria-label="Scroll to Modfalk agents">+</a>
+    </header>
+    <main>
+      <section class="agents-section" id="agents" aria-labelledby="agents-heading">
+        <div class="section-kicker"><span>MODFALK / THE WORKBENCH</span><span>01 — 04</span></div>
+        <div class="agents-intro">
+          <h1 id="agents-heading">Connected facts.<br><span>Reviewable action.</span></h1>
+          <p>Choose a domain, run its graph agent, inspect the sources and path, then review the proposed action.</p>
+        </div>
+        <nav id="tabs" class="agent-tabs" role="tablist" aria-label="Modfalk agents">
+          <button type="button" role="tab" aria-selected="true" data-domain="case"><span class="tab-number">01</span><span class="tab-name">Case Evidence</span><span class="tab-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" role="tab" aria-selected="false" data-domain="medical"><span class="tab-number">02</span><span class="tab-name">Medical overlook</span><span class="tab-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" role="tab" aria-selected="false" data-domain="disaster"><span class="tab-number">03</span><span class="tab-name">Disaster response</span><span class="tab-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" role="tab" aria-selected="false" data-domain="sports"><span class="tab-number">04</span><span class="tab-name">Sports Forcast</span><span class="tab-arrow" aria-hidden="true">↗</span></button>
+        </nav>
+        <section class="workspace" id="workspace" aria-label="Agent workspace">
+          <div class="left">
+            <div class="section-title"><span>01 / INPUT</span><span id="domain-tag">SYNTHETIC CASE</span></div>
+            <h2 id="agent-title">Case Evidence</h2>
+            <p id="agent-description">Compare statements and exhibits connected to the same synthetic event. Findings become lawyer-review tasks.</p>
+            <form id="agent-form">
+              <label for="record-id">SELECT RECORD</label>
+              <select id="record-id" required></select>
+              <div id="custom-wrap" hidden><label for="custom-id">OR ENTER AN IMPORTED NWS ALERT ID</label><input id="custom-id" type="text" placeholder="nws-…"></div>
+              <div id="case-extra"><label for="jurisdiction">GUIDANCE JURISDICTION</label><select id="jurisdiction"><option value="US">United States</option><option value="EW">England and Wales</option><option value="CA">Canada</option></select></div>
+              <div id="sports-extra" hidden><div class="field-grid"><div><label for="minute">MANUAL MINUTE</label><input id="minute" type="number" min="0" max="90" value="0"></div><div><label for="home-goals">HOME GOALS</label><input id="home-goals" type="number" min="0" max="20" value="0"></div><div><label for="away-goals">AWAY GOALS</label><input id="away-goals" type="number" min="0" max="20" value="0"></div></div><p class="hint">Historical replay. Changing the score or minute creates a new forecast revision.</p></div>
+              <button id="run" type="submit">Run graph agent <span aria-hidden="true">↗</span></button>
+            </form>
+            <div class="boundary"><strong>HUMAN REVIEW BOUNDARY</strong><p id="boundary-text">This agent highlights records. It does not decide guilt, admissibility, or disclosure duty.</p></div>
+          </div>
+          <div class="right">
+            <div class="section-title"><span>02 / GRAPH RESULT</span><span id="result-state">WAITING FOR INPUT</span></div>
+            <div id="result" class="empty"><span class="empty-icon" aria-hidden="true">+</span><h3>No investigation yet.</h3><p>Select a record and run the agent to see its connected path, sources, and proposed action.</p></div>
+          </div>
+        </section>
+        <section class="activity" id="reviews" aria-label="Review queue">
+          <div class="section-title"><span>03 / REVIEW QUEUE</span><span>STORED IN FALKORDB</span></div>
+          <div id="actions" class="actions"><p class="muted">Run an agent to populate the review queue.</p></div>
+        </section>
+      </section>
+    </main>
+    <footer><span>+ &nbsp; Modfalk</span><span>Synthetic and public demonstration data. Human review required for every proposed action.</span><a href="#top">Back to top ↑</a></footer>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
