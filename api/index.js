@@ -4,6 +4,6 @@ let appPromise;
 
 export default async function handler(req, res) {
   appPromise ||= createAppServer();
-  const {server} = await appPromise;
-  server.emit('request', req, res);
+  const {handler: requestHandler} = await appPromise;
+  await requestHandler(req, res);
 }

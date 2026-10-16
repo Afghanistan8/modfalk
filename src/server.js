@@ -12,7 +12,7 @@ const body=async req=>{let text='';for await(const chunk of req){text+=chunk;if(
 
 export async function createAppServer(options={}) {
   const mcp=await createGraphMcpClient(options.query);
-  const server=http.createServer(async(req,res)=>{
+  const handler=async(req,res)=>{
     try {
       const url=new URL(req.url,'http://localhost');
       if(req.method==='GET'&&url.pathname==='/api/health'){
@@ -50,8 +50,9 @@ export async function createAppServer(options={}) {
       }
       return json(res,404,{error:'Not found'});
     }catch(e){json(res,/Invalid|Unknown|large|JSON/.test(e.message)?400:503,{error:e.message});}
-  });
-  return {server,close:async()=>{await new Promise(resolve=>server.close(resolve));await mcp.close();if(!options.query)await closeDb();}};
+  };
+  const server=http.createServer(handler);
+  return {server,handler,close:async()=>{await new Promise(resolve=>server.close(resolve));await mcp.close();if(!options.query)await closeDb();}};
 }
 
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
